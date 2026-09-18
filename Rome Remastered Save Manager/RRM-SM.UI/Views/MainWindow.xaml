@@ -1,6 +1,7 @@
 <Window x:Class="RRM_SM.UI.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:RRM_SM.UI.Views"
         Title="Total War: ROME REMASTERED — Save Manager"
         Width="940" Height="680"
         MinWidth="750" MinHeight="500"
@@ -612,7 +613,12 @@
                 </Grid>
             </TabItem>
 
-            <!-- ─── TAB 2: Settings ─── -->
+            <!-- ─── TAB 2: Chronicle & AAR ─── -->
+            <TabItem Header="📜 Campaign Chronicle &amp; AAR">
+                <views:ChronicleTab />
+            </TabItem>
+
+            <!-- ─── TAB 3: Settings ─── -->
             <TabItem Header="⚙  Settings">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
                     <StackPanel>

@@ -16,6 +16,8 @@ A friendly, robust save manager and backup utility for **Total War: ROME REMASTE
   - [Creating Backups](#creating-backups)
   - [Restoring a Past Save](#restoring-a-past-save)
   - [Filtering & Searching by Faction](#filtering--searching-by-faction)
+  - [Autosave Sentinel & Background Monitoring](#autosave-sentinel--background-monitoring)
+  - [Campaign Chronologer & AAR Generator (New!)](#campaign-chronologer--aar-generator-new)
   - [Configuring Settings](#configuring-settings)
 - [Using the Command-Line Interface (CLI)](#using-the-command-line-interface-cli)
   - [Interactive Menu Mode](#interactive-menu-mode)
@@ -41,6 +43,9 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 
 ## Key Features
 
+- **Campaign Chronologer & AAR Generator (New!)**: Turn your gameplay history into an epic saga. Aggregates active saves and backups into a unified chronological timeline, lets you write journal entries, title milestones, add tags, and export publication-ready After Action Reports in styled HTML or Markdown.
+- **Autosave Sentinel (Background Watcher)**: Automatically creates snapshots in real time whenever Rome Remastered writes or updates a save to disk, complete with debouncing and file-lock protection.
+- **System Tray & Desktop Integration**: Minimizes or closes to the Windows notification area, keeps the Autosave Sentinel running quietly while you game, provides balloon notifications, and includes a one-click Steam game launcher (`⚔ Launch Game`).
 - **Automatic Campaign & Faction Recognition**: Automatically identifies the faction or campaign name directly from savefile names (supporting Rome Remastered autosaves, manual hyphenated saves, direct faction names, and smart quicksave association).
 - **Faction-Sorted Backup Folders**: Backups are organized on disk into dedicated faction subfolders (e.g. `Rome Remastered Backups/Kingdom of Macedon/Backup_...`).
 - **Per-Campaign Retention**: When retention limits are enabled, snapshots are managed on a per-campaign basis — starting a new campaign will **not** purge backups of your older campaigns!
@@ -50,6 +55,7 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 - **Custom Named Checkpoints**: Label your backups (e.g. `Julii_Turn30_Invading_Gaul`, `Brutii_Before_Senate_Demands`).
 - **Safety-First Restore**: Restoring a backup automatically creates a pre-restore safety copy first. You never risk losing your current save by rolling back.
 - **Optional ZIP Compression**: Save disk space by storing snapshots as `.zip` archives or keep them as plain folders.
+- **Accessible UI Polish**: Fully supports high-contrast accessible controls with customized dropdowns and responsive keyboard shortcuts.
 - **CLI & Scripting Ready**: Run unattended backups via commands or automate them before launching the game.
 
 ---
@@ -147,6 +153,55 @@ Switch to the **Backups Manager** tab:
 
 ---
 
+### Autosave Sentinel & Background Monitoring
+
+The **Autosave Sentinel** monitors your Rome Remastered game save folder in real time (`FileSystemWatcher`) and automatically takes backup snapshots without any manual intervention.
+
+1. **How It Works**:
+   - Whenever Rome Remastered saves the game (end of turn autosave, quicksave, or manual battle save), the Sentinel detects the file write.
+   - It utilizes a customizable **debounce buffer** (default `1500 ms`) to let the game finish its multi-stage disk flush cleanly.
+   - Built-in file lock retry logic (`WaitForFileAvailable`) safely waits for the game engine to release exclusive file locks before copying.
+   - The backup is immediately filed under the detected campaign folder and labeled `AutosaveSentinel_[Timestamp]`.
+2. **Interactive Header Pill & System Tray**:
+   - Click the **`🛡 Sentinel: Active` / `🛡 Sentinel: Off`** badge in the window header to quickly toggle monitoring on and off.
+   - When **Minimize to System Tray** is enabled, minimizing or clicking `[X]` to close the window will send the app to the Windows system tray. The Sentinel continues protecting your saves while you game in full screen!
+   - Right-click the tray icon to toggle the Sentinel, perform an instant quick backup, launch the game, or restore the window.
+   - When **Windows Notifications** are enabled, balloon/toast messages notify you whenever an automated background backup succeeds.
+
+---
+
+### Campaign Chronologer & AAR Generator (New!)
+
+The **Campaign Chronicle & AAR** tab turns your collection of saves into an interactive campaign timeline and lets you write your own After Action Reports (AARs) or historical lore journals.
+
+#### What Does the Chronologer Do?
+- **Unified Timeline Aggregation**: Combines active game saves from your game folder with all archived snapshots from your backup directories into one cohesive chronological timeline ordered by date and turn number.
+- **De-duplication**: Identifies saves across folders by name and timestamp so your timeline remains clean and accurate without redundant duplicate entries.
+- **Per-Turn Milestone Journaling**: Click on any milestone/turn on the timeline to write custom event headlines, lore notes, battle summaries, and tags.
+- **Portable Note Storage (`chronicle.json`)**: All your journal entries and tags are saved inside a lightweight `chronicle.json` file inside that specific campaign's backup directory. Your notes naturally travel alongside your backups if you move or sync folders!
+- **One-Click Publishing (HTML & Markdown)**: Generates complete, styled After Action Reports with a single click.
+
+#### Step-by-Step Instructions:
+1. **Select a Campaign**:
+   - Switch to the **📜 Campaign Chronicle & AAR** tab.
+   - In the **Chronicle Campaign** dropdown at the top, select the campaign or faction you want to view (e.g., `Republic of Rome` or `Kingdom of Macedon`).
+   - The summary badge will immediately display total milestones detected and the highest reached turn (e.g., `42 Milestones | Max Turn 185`).
+2. **Browse the Timeline**:
+   - The left pane displays all historical milestones sorted chronologically.
+   - Each entry shows the turn badge (`T6`, `T20`, etc.), save category (`Autosave`, `Manual`, `Battle`, `Quicksave`), timestamp, and custom event headline.
+3. **Record Journal Notes & Milestones**:
+   - Click any milestone in the timeline. The right pane will open the **Journal Editor**.
+   - **Event Title / Headline**: Give this turn a memorable name (e.g., *The Siege of Syracuse*, *Defeat of the Gallic Horde*, *First Senate Triumph*).
+   - **Journal Notes**: Write your in-character roleplay lore, tactical notes, thoughts, or battle summaries. Supports multi-line paragraphs.
+   - **Quick Tags**: Enter comma-separated tags (e.g., `Battle, Expansion, Crisis, Economy`) to categorize the event.
+   - Click **💾 Save Journal Notes** to commit the notes to `chronicle.json`.
+4. **Export After Action Reports (AAR)**:
+   - **📜 Export HTML**: Compiles your entire campaign timeline, faction summary, and notes into an elegant, styled standalone HTML report and automatically launches it in your default web browser for viewing or printing to PDF.
+   - **📝 Copy Markdown**: Formats the entire campaign chronicle into clean GitHub/forum-compatible Markdown and copies it directly to your clipboard, ready to paste into Reddit, Discord, Steam Guides, or Total War community forums!
+   - **🔄 Refresh**: Re-scans active saves and backups at any time to immediately pull in new turns played during your gaming session.
+
+---
+
 ### Configuring Settings
 
 Under the **Settings** tab, you can customize:
@@ -157,6 +212,10 @@ Under the **Settings** tab, you can customize:
 | **Backup Storage Directory** | Where all your snapshots are stored. | `Documents\Rome Remastered Backups` |
 | **Compress backups (.zip)** | Toggle between folder snapshots or compressed `.zip` archives to save disk space. | Unchecked (Folder snapshots) |
 | **Max Backups to Keep** | Limits total stored backups per campaign to avoid consuming too much disk space. Set to `0` for unlimited. | `0` (Unlimited) |
+| **Autosave Sentinel** | Automatically triggers a backup snapshot when the game writes to disk. | Unchecked (`false`) |
+| **Windows Notifications** | Displays balloon notifications when an automated background backup occurs. | Checked (`true`) |
+| **System Tray** | Minimizes/closes the app to the Windows tray so background monitoring continues uninterrupted. | Checked (`true`) |
+| **Save Detection Buffer** | Debounce delay in milliseconds before copying saves to guarantee file flushes are completed. | `1500 ms` |
 
 ---
 
@@ -261,6 +320,9 @@ Because the game uses the faction name in the autosave format, saves from two se
 
 ### 3. Will my older campaigns be deleted when retention limit is reached?
 No! Retention limits are applied **per campaign**. If your retention limit is set to 5, you can have 5 backups for Macedon, 5 for Pergamon, and 5 for Rome without them overwriting each other.
+
+### 4. Where are my Campaign Chronicle notes and AAR journals stored?
+Chronicle notes are saved in a JSON file (`chronicle.json`) directly inside that campaign's backup folder (`<BackupDirectory>/<CampaignName>/chronicle.json`). Because the file resides right alongside your snapshots, your lore, milestone headlines, and custom notes automatically travel with your backups if you copy or sync them to another machine.
 
 ---
 

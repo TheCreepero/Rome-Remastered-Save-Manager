@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using RRM_SM.Models;
+using RRM_SM.Core.Models;
 using RRM_SM.Services;
 using RRM_SM.UI.Services;
 using MessageBox = System.Windows.MessageBox;
@@ -22,6 +23,8 @@ namespace RRM_SM.UI.ViewModels
         private readonly ConfigService _configService;
         private readonly AppConfig _config;
         private BackupService _backupService;
+        private readonly ChronicleService _chronicleService;
+        private readonly CampaignParserService _parserService;
 
         private ObservableCollection<BackupEntry> _allBackups = new();
         private ObservableCollection<BackupEntry> _filteredBackups = new();
@@ -55,6 +58,13 @@ namespace RRM_SM.UI.ViewModels
         private int _totalBackupCount;
         private string _totalBackupSize = "0 B";
 
+        // Chronicle properties
+        private string? _selectedChronicleCampaign;
+        private ObservableCollection<ChronicleMilestone> _chronicleMilestones = new();
+        private ChronicleMilestone? _selectedMilestone;
+        private string _chronicleStatsSummary = string.Empty;
+        private CampaignChronicle? _currentChronicle;
+
         public Action? RestoreWindowRequested { get; set; }
         public Action? ExitApplicationRequested { get; set; }
         public TrayService TrayService => _trayService;
@@ -64,6 +74,8 @@ namespace RRM_SM.UI.ViewModels
             _configService = new ConfigService();
             _config = _configService.LoadOrCreateConfig();
             _backupService = new BackupService(_config);
+            _parserService = new CampaignParserService();
+            _chronicleService = new ChronicleService(_config, _parserService);
 
             // Initialize from config
             _gameSaveDirectory = _config.GameSaveDirectory;
@@ -133,6 +145,11 @@ namespace RRM_SM.UI.ViewModels
             SaveSettingsCommand = new RelayCommand(ExecuteSaveSettings);
             ResetDefaultsCommand = new RelayCommand(ExecuteResetDefaults);
 
+            SaveMilestoneNotesCommand = new RelayCommand(ExecuteSaveMilestoneNotes, () => SelectedMilestone != null);
+            ExportHtmlReportCommand = new RelayCommand(ExecuteExportHtmlReport, () => _currentChronicle != null);
+            ExportMarkdownReportCommand = new RelayCommand(ExecuteExportMarkdownReport, () => _currentChronicle != null);
+            RefreshChronicleCommand = new RelayCommand(ExecuteRefreshChronicle, () => !string.IsNullOrEmpty(SelectedChronicleCampaign));
+
             // Initial load
             RefreshPathStatuses();
             ExecuteRefreshBackups();
@@ -178,6 +195,13 @@ namespace RRM_SM.UI.ViewModels
         {
             get => _activeCampaigns;
             set { _activeCampaigns = value; OnPropertyChanged(); }
+        }
+
+        private ObservableCollection<string> _allKnownCampaigns = new();
+        public ObservableCollection<string> AllKnownCampaigns
+        {
+            get => _allKnownCampaigns;
+            set { _allKnownCampaigns = value; OnPropertyChanged(); }
         }
 
         public string? SelectedActiveCampaign
@@ -321,6 +345,60 @@ namespace RRM_SM.UI.ViewModels
             set { _totalBackupSize = value; OnPropertyChanged(); }
         }
 
+        // Chronicle Properties
+        public string? SelectedChronicleCampaign
+        {
+            get => _selectedChronicleCampaign;
+            set
+            {
+                if (_selectedChronicleCampaign != value)
+                {
+                    _selectedChronicleCampaign = value;
+                    OnPropertyChanged();
+                    ExecuteRefreshChronicle();
+                }
+            }
+        }
+
+        public ObservableCollection<ChronicleMilestone> ChronicleMilestones
+        {
+            get => _chronicleMilestones;
+            set { _chronicleMilestones = value; OnPropertyChanged(); }
+        }
+
+        public ChronicleMilestone? SelectedMilestone
+        {
+            get => _selectedMilestone;
+            set 
+            { 
+                _selectedMilestone = value; 
+                OnPropertyChanged();
+                
+                // When we select a milestone, we update the tags string
+                if (_selectedMilestone != null)
+                {
+                    MilestoneTagsString = string.Join(", ", _selectedMilestone.Tags);
+                }
+                else
+                {
+                    MilestoneTagsString = string.Empty;
+                }
+            }
+        }
+
+        private string _milestoneTagsString = string.Empty;
+        public string MilestoneTagsString
+        {
+            get => _milestoneTagsString;
+            set { _milestoneTagsString = value; OnPropertyChanged(); }
+        }
+
+        public string ChronicleStatsSummary
+        {
+            get => _chronicleStatsSummary;
+            set { _chronicleStatsSummary = value; OnPropertyChanged(); }
+        }
+
         // ───────────────────── Commands ─────────────────────
 
         public ICommand QuickBackupCommand { get; }
@@ -341,6 +419,11 @@ namespace RRM_SM.UI.ViewModels
         public ICommand OpenConfigCommand { get; }
         public ICommand SaveSettingsCommand { get; }
         public ICommand ResetDefaultsCommand { get; }
+
+        public ICommand SaveMilestoneNotesCommand { get; }
+        public ICommand ExportHtmlReportCommand { get; }
+        public ICommand ExportMarkdownReportCommand { get; }
+        public ICommand RefreshChronicleCommand { get; }
 
         // ───────────────────── Backup Operations ─────────────────────
 
@@ -533,6 +616,16 @@ namespace RRM_SM.UI.ViewModels
                     OnPropertyChanged(nameof(SelectedCampaignFilter));
                 }
 
+                var knownCampaigns = new HashSet<string>(activeList, StringComparer.OrdinalIgnoreCase);
+                foreach (var c in distinctCampaigns) knownCampaigns.Add(c);
+                var sortedKnown = knownCampaigns.OrderBy(k => k).ToList();
+                AllKnownCampaigns = new ObservableCollection<string>(sortedKnown);
+                
+                if (SelectedChronicleCampaign == null && sortedKnown.Any())
+                {
+                    SelectedChronicleCampaign = sortedKnown.Contains(mostRecent) ? mostRecent : sortedKnown.First();
+                }
+
                 ApplyFilter();
                 TotalBackupCount = backups.Count;
                 long total = backups.Sum(b => b.TotalSizeBytes);
@@ -699,6 +792,100 @@ namespace RRM_SM.UI.ViewModels
             AutoWatcherDebounceMs = 1500;
             ExecuteSaveSettings();
             StatusMessage = "✔ Settings reset to defaults.";
+        }
+
+        // ───────────────────── Chronicle Operations ─────────────────────
+
+        private void ExecuteRefreshChronicle()
+        {
+            if (string.IsNullOrWhiteSpace(SelectedChronicleCampaign))
+            {
+                ChronicleMilestones.Clear();
+                _currentChronicle = null;
+                ChronicleStatsSummary = string.Empty;
+                return;
+            }
+
+            try
+            {
+                _currentChronicle = _chronicleService.BuildChronicle(SelectedChronicleCampaign);
+                ChronicleMilestones = new ObservableCollection<ChronicleMilestone>(_currentChronicle.Milestones);
+                
+                int totalTurns = _currentChronicle.MaxTurn;
+                int count = _currentChronicle.Milestones.Count;
+                
+                ChronicleStatsSummary = $"{count} Milestones | Max Turn {totalTurns}";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Failed to build chronicle: {ex.Message}";
+            }
+        }
+
+        private void ExecuteSaveMilestoneNotes()
+        {
+            if (_currentChronicle == null || SelectedMilestone == null) return;
+            
+            // Parse tags
+            var newTags = MilestoneTagsString
+                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .ToList();
+                
+            SelectedMilestone.Tags = newTags;
+
+            try
+            {
+                _chronicleService.SaveChronicleNotes(_currentChronicle);
+                StatusMessage = "✔ Journal notes saved successfully.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Failed to save notes: {ex.Message}";
+                MessageBox.Show($"Failed to save notes:\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ExecuteExportHtmlReport()
+        {
+            if (_currentChronicle == null) return;
+            
+            try
+            {
+                string html = _chronicleService.GenerateHtmlReport(_currentChronicle);
+                string path = Path.Combine(Path.GetTempPath(), $"{_currentChronicle.CampaignName}_Chronicle.html");
+                File.WriteAllText(path, html);
+                
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true
+                });
+                
+                StatusMessage = "✔ HTML Report generated and opened.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Failed to export HTML: {ex.Message}";
+                MessageBox.Show($"Failed to export HTML:\n{ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ExecuteExportMarkdownReport()
+        {
+            if (_currentChronicle == null) return;
+            
+            try
+            {
+                string md = _chronicleService.GenerateMarkdownReport(_currentChronicle);
+                Clipboard.SetText(md);
+                StatusMessage = "✔ Markdown Report copied to clipboard.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Failed to export Markdown: {ex.Message}";
+                MessageBox.Show($"Failed to export Markdown:\n{ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         public void Cleanup()
