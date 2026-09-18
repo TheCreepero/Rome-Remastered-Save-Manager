@@ -260,8 +260,8 @@ namespace RRM_SM
             for (int i = 0; i < backups.Count; i++)
             {
                 var b = backups[i];
-                string marker = b.IsSafetyBackup ? "[SAFETY] " : "";
-                Console.ForegroundColor = b.IsSafetyBackup ? ConsoleColor.DarkYellow : ConsoleColor.Gray;
+                string marker = b.IsPinned ? "[★ PINNED] " : (b.IsSentinelBackup ? "[SENTINEL] " : (b.IsSafetyBackup ? "[SAFETY] " : ""));
+                Console.ForegroundColor = b.IsPinned ? ConsoleColor.Yellow : (b.IsSafetyBackup ? ConsoleColor.DarkYellow : (b.IsSentinelBackup ? ConsoleColor.Cyan : ConsoleColor.Gray));
                 Console.WriteLine($"{i + 1,-4} {Truncate(b.CampaignName, 21),-22} {b.CreatedAt:yyyy-MM-dd HH:mm:ss,-20} {b.FormattedSize,-10} {b.FileCount,-6} {marker}{b.Name}");
             }
 
@@ -290,7 +290,7 @@ namespace RRM_SM
             for (int i = 0; i < backups.Count; i++)
             {
                 var b = backups[i];
-                string marker = b.IsSafetyBackup ? "[SAFETY] " : "";
+                string marker = b.IsPinned ? "[★ PINNED] " : (b.IsSentinelBackup ? "[SENTINEL] " : (b.IsSafetyBackup ? "[SAFETY] " : ""));
                 Console.WriteLine($"{i + 1,-4} {Truncate(b.CampaignName, 21),-22} {b.CreatedAt:yyyy-MM-dd HH:mm:ss,-20} {b.FormattedSize,-10} {marker}{b.Name}");
             }
 
@@ -381,11 +381,13 @@ namespace RRM_SM
                 Console.WriteLine($"  [4] Compression (.zip)    : {(_config.CompressBackups ? "Enabled" : "Disabled")}");
                 Console.WriteLine($"  [5] Max Backups to Keep   : {(_config.MaxBackupsToKeep > 0 ? _config.MaxBackupsToKeep.ToString() : "Unlimited (0)")}");
                 Console.WriteLine($"  [6] Open config.json      : Open file in default editor");
+                Console.WriteLine($"  [7] Rebuild Vault Index   : Scan on-disk .sav files and repair vault.json");
+                Console.WriteLine($"  [8] Migrate Legacy Backups: Import old nested folder snapshots into flat vault");
                 Console.WriteLine($"  [0] Back to Main Menu");
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
                 Console.WriteLine("--------------------------------------------------------------------------------");
                 Console.ResetColor();
-                Console.Write("\nSelect a setting to edit [0-6]: ");
+                Console.Write("\nSelect a setting to edit [0-8]: ");
 
                 string? choice = Console.ReadLine()?.Trim();
                 switch (choice)
@@ -460,6 +462,32 @@ namespace RRM_SM
                             PrintColored($"Failed to open config file: {ex.Message}", ConsoleColor.Red);
                             WaitForKey();
                         }
+                        break;
+                    case "7":
+                        try
+                        {
+                            PrintColored("--> Rebuilding vault index from on-disk .sav files...", ConsoleColor.Cyan);
+                            _backupService.VaultService.RebuildIndexFromDisk();
+                            PrintColored("✔ Save Vault index successfully rebuilt from disk.", ConsoleColor.Green);
+                        }
+                        catch (Exception ex)
+                        {
+                            PrintColored($"✖ Rebuild failed: {ex.Message}", ConsoleColor.Red);
+                        }
+                        WaitForKey();
+                        break;
+                    case "8":
+                        try
+                        {
+                            PrintColored("--> Scanning for legacy nested backup folders...", ConsoleColor.Cyan);
+                            int migrated = _backupService.VaultService.MigrateLegacyBackups();
+                            PrintColored($"✔ Successfully migrated {migrated} legacy save file(s) into flat vault.", ConsoleColor.Green);
+                        }
+                        catch (Exception ex)
+                        {
+                            PrintColored($"✖ Migration failed: {ex.Message}", ConsoleColor.Red);
+                        }
+                        WaitForKey();
                         break;
                     case "0":
                     case "exit":

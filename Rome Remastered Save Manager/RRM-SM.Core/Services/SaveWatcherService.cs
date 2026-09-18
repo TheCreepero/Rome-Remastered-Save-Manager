@@ -176,8 +176,8 @@ namespace RRM_SM.Services
 
             try
             {
-                // Identify target campaigns
-                var campaignsToBackup = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                // Group changed files by target campaign
+                var campaignFilesMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
                 string latestFile = string.Empty;
 
                 foreach (var file in filesToProcess)
@@ -199,23 +199,30 @@ namespace RRM_SM.Services
 
                     if (!string.IsNullOrWhiteSpace(campaign))
                     {
-                        campaignsToBackup.Add(campaign);
+                        if (!campaignFilesMap.TryGetValue(campaign, out var list))
+                        {
+                            list = new List<string>();
+                            campaignFilesMap[campaign] = list;
+                        }
+                        list.Add(file);
                     }
                 }
 
-                if (campaignsToBackup.Count == 0)
+                if (campaignFilesMap.Count == 0 && filesToProcess.Count > 0)
                 {
                     string fallbackCampaign = _backupService.GetMostRecentCampaign();
                     if (!string.IsNullOrWhiteSpace(fallbackCampaign))
                     {
-                        campaignsToBackup.Add(fallbackCampaign);
+                        campaignFilesMap[fallbackCampaign] = filesToProcess.Where(File.Exists).ToList();
                     }
                 }
 
-                foreach (var campaign in campaignsToBackup)
+                foreach (var kvp in campaignFilesMap)
                 {
-                    var backup = _backupService.CreateCampaignBackup(campaign, "AutosaveSentinel");
-                    StatusChanged?.Invoke(this, $"Sentinel: Automatic snapshot created for '{campaign}'.");
+                    string campaign = kvp.Key;
+                    var changedFiles = kvp.Value;
+                    var backup = _backupService.CreateSentinelBackup(campaign, changedFiles);
+                    StatusChanged?.Invoke(this, $"Sentinel: Automatic snapshot created for '{campaign}' ({backup.FileCount} file{(backup.FileCount == 1 ? "" : "s")}, {backup.FormattedSize}).");
                     BackupCreated?.Invoke(this, new BackupCreatedEventArgs(backup, latestFile, campaign));
                 }
             }

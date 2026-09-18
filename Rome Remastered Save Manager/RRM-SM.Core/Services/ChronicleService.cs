@@ -22,12 +22,14 @@ namespace RRM_SM.Services
 
         private string GetChronicleFilePath(string campaignName)
         {
-            string backupFolder = Path.Combine(_config.BackupDirectory, campaignName);
-            if (!Directory.Exists(backupFolder))
-            {
-                Directory.CreateDirectory(backupFolder);
-            }
-            return Path.Combine(backupFolder, "chronicle.json");
+            string cleanCampaign = CampaignParserService.CleanFactionName(campaignName);
+            string flatPath = Path.Combine(_config.BackupDirectory, $"chronicle_{cleanCampaign}.json");
+            if (File.Exists(flatPath)) return flatPath;
+
+            string legacyPath = Path.Combine(_config.BackupDirectory, cleanCampaign, "chronicle.json");
+            if (File.Exists(legacyPath)) return legacyPath;
+
+            return flatPath;
         }
 
         public CampaignChronicle BuildChronicle(string campaignName)
@@ -68,10 +70,10 @@ namespace RRM_SM.Services
                 allFiles.AddRange(Directory.GetFiles(activeFolder, "*.sav"));
             }
 
-            string backupFolder = Path.Combine(_config.BackupDirectory, campaignName);
+            string backupFolder = _config.BackupDirectory;
             if (Directory.Exists(backupFolder))
             {
-                allFiles.AddRange(Directory.GetFiles(backupFolder, "*.sav"));
+                allFiles.AddRange(Directory.GetFiles(backupFolder, "*.sav", SearchOption.AllDirectories));
             }
 
             var groupedSaves = _parserService.GroupSaveFiles(allFiles);

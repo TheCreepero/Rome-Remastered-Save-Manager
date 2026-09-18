@@ -22,6 +22,7 @@ namespace RRM_SM.UI.Views
             // Wire up dialog callbacks (keeps ViewModel free of WPF UI dependencies)
             viewModel.InputDialogRequested = ShowInputDialog;
             viewModel.FolderBrowserRequested = ShowFolderBrowser;
+            viewModel.EditSaveDialogRequested = ShowEditSaveDialog;
             viewModel.RestoreWindowRequested = RestoreWindow;
             viewModel.ExitApplicationRequested = ExitApplication;
 
@@ -81,10 +82,28 @@ namespace RRM_SM.UI.Views
             if (DataContext is MainViewModel vm)
             {
                 bool hasSelection = vm.SelectedBackup != null && !vm.IsBusy;
+                MenuTogglePin.IsEnabled = hasSelection;
+                MenuEditDetails.IsEnabled = hasSelection;
                 MenuRestore.IsEnabled = hasSelection;
                 MenuOpenExplorer.IsEnabled = vm.SelectedBackup != null;
                 MenuCopyPath.IsEnabled = vm.SelectedBackup != null;
                 MenuDelete.IsEnabled = hasSelection;
+            }
+        }
+
+        private void ContextMenu_TogglePin_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.SelectedBackup != null)
+            {
+                vm.TogglePinCommand.Execute(vm.SelectedBackup);
+            }
+        }
+
+        private void ContextMenu_EditMetadata_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.SelectedBackup != null)
+            {
+                vm.EditSaveMetadataCommand.Execute(null);
             }
         }
 
@@ -128,6 +147,25 @@ namespace RRM_SM.UI.Views
             };
             bool? result = dialog.ShowDialog();
             return result == true ? dialog.ResponseText : null;
+        }
+
+        private bool ShowEditSaveDialog(RRM_SM.Models.BackupEntry backup)
+        {
+            var dialog = new EditSaveDialog(backup)
+            {
+                Owner = this
+            };
+
+            bool? result = dialog.ShowDialog();
+            if (result == true)
+            {
+                if (DataContext is MainViewModel vm && !string.IsNullOrWhiteSpace(backup.VaultId))
+                {
+                    vm.UpdateSaveMetadata(backup.VaultId, dialog.SaveTitle, dialog.Notes, dialog.Tags, dialog.IsPinned);
+                    return true;
+                }
+            }
+            return false;
         }
 
         private string? ShowFolderBrowser(string title, string initialDir)

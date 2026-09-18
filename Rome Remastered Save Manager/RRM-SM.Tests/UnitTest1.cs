@@ -162,12 +162,11 @@ namespace RRM_SM.Tests
 
             Assert.NotNull(scotBackup);
             Assert.Equal("Kingdom of Scotland", scotBackup.CampaignName);
-            Assert.True(Directory.Exists(scotBackup.FullPath));
-            Assert.Contains("Kingdom of Scotland", scotBackup.FullPath);
+            Assert.True(File.Exists(scotBackup.FullPath));
 
             // Scotland backup should ONLY contain Scotland save, not Pergamon
-            Assert.True(File.Exists(Path.Combine(scotBackup.FullPath, Path.GetFileName(scotSave))));
-            Assert.False(File.Exists(Path.Combine(scotBackup.FullPath, Path.GetFileName(pergSave))));
+            Assert.True(File.Exists(Path.Combine(_backupDir, Path.GetFileName(scotSave))));
+            Assert.False(File.Exists(Path.Combine(_backupDir, Path.GetFileName(pergSave))));
 
             // Backups list should discover it with correct campaign name
             var allBackups = backupService.GetBackups();

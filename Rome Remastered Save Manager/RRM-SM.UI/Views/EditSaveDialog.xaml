@@ -1,0 +1,108 @@
+<Window x:Class="RRM_SM.UI.Views.EditSaveDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Edit Save Details"
+        Width="500" Height="460"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#1E1E2E"
+        FocusManager.FocusedElement="{Binding ElementName=TitleBox}">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="AccentGold" Color="#C9A84C"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#5E5E7E"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#B0B0D0"/>
+
+        <Style x:Key="AccessibleFocusVisual">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Rectangle Stroke="#FFD700" StrokeThickness="2" StrokeDashArray="2 2"
+                                   SnapsToDevicePixels="True" Margin="-2"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header / Info Bar -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="EDIT SAVE DETAILS &amp; NOTES"
+                       Foreground="{StaticResource AccentGold}" FontSize="15" FontWeight="Bold"/>
+            <TextBlock x:Name="FileInfoText" Text="save_Quicksave.sav (Campaign: Rome)"
+                       Foreground="{StaticResource TextSecondary}" FontSize="11.5" Margin="0,2,0,0"/>
+        </StackPanel>
+
+        <!-- Custom Title -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,10">
+            <TextBlock Text="Custom Title / Bookmark Label:" Foreground="#FFFFFF" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <TextBox x:Name="TitleBox"
+                     Background="#25253E" Foreground="#FFFFFF"
+                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="8,5" FontSize="13"
+                     VerticalContentAlignment="Center"
+                     FocusVisualStyle="{StaticResource AccessibleFocusVisual}"
+                     AutomationProperties.Name="Custom Title"/>
+        </StackPanel>
+
+        <!-- Tags -->
+        <StackPanel Grid.Row="2" Margin="0,0,0,10">
+            <TextBlock Text="Tags (comma-separated, e.g. Battle, Crucial, Milestone):" Foreground="#FFFFFF" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <TextBox x:Name="TagsBox"
+                     Background="#25253E" Foreground="#FFFFFF"
+                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="8,5" FontSize="13"
+                     VerticalContentAlignment="Center"
+                     FocusVisualStyle="{StaticResource AccessibleFocusVisual}"
+                     AutomationProperties.Name="Save Tags"/>
+        </StackPanel>
+
+        <!-- Notes -->
+        <Grid Grid.Row="3" Margin="0,0,0,10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="Campaign Lore &amp; Notes:" Foreground="#FFFFFF" FontSize="12.5" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <TextBox Grid.Row="1" x:Name="NotesBox"
+                     Background="#25253E" Foreground="#FFFFFF"
+                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="8,6" FontSize="12.5"
+                     AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                     FocusVisualStyle="{StaticResource AccessibleFocusVisual}"
+                     AutomationProperties.Name="Save Notes"/>
+        </Grid>
+
+        <!-- Pin CheckBox -->
+        <CheckBox Grid.Row="4" x:Name="PinnedCheckBox" Margin="0,4,0,12" VerticalContentAlignment="Center" Cursor="Hand">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⭐ " FontSize="14"/>
+                <TextBlock Text="Pin this save (Mark as Milestone &amp; protect from auto-pruning)"
+                           Foreground="{StaticResource AccentGold}" FontWeight="SemiBold" FontSize="12.5"/>
+            </StackPanel>
+        </CheckBox>
+
+        <!-- Actions -->
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+            <Button Content="_Save Changes" Width="110" Padding="0,7" Margin="0,0,10,0"
+                    Background="#5A4A20" Foreground="{StaticResource AccentGold}" BorderBrush="{StaticResource AccentGold}" BorderThickness="1"
+                    Click="SaveButton_Click" IsDefault="True" Cursor="Hand"
+                    FocusVisualStyle="{StaticResource AccessibleFocusVisual}"
+                    AutomationProperties.Name="Save Changes"/>
+            <Button Content="_Cancel" Width="85" Padding="0,7"
+                    Background="#3E3E5E" Foreground="#FFFFFF" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    Click="CancelButton_Click" IsCancel="True" Cursor="Hand"
+                    FocusVisualStyle="{StaticResource AccessibleFocusVisual}"
+                    AutomationProperties.Name="Cancel"/>
+        </StackPanel>
+    </Grid>
+</Window>
+

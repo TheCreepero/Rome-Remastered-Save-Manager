@@ -43,20 +43,14 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 
 ## Key Features
 
-- **Campaign Chronologer & AAR Generator (New!)**: Turn your gameplay history into an epic saga. Aggregates active saves and backups into a unified chronological timeline, lets you write journal entries, title milestones, add tags, and export publication-ready After Action Reports in styled HTML or Markdown.
-- **Autosave Sentinel (Background Watcher)**: Automatically creates snapshots in real time whenever Rome Remastered writes or updates a save to disk, complete with debouncing and file-lock protection.
+- **Flat "Save Vault" Architecture (New!)**: All backup saves are stored as discrete, standalone `.sav` files directly inside your backup folder matching the game's flat save directory structure. No nested snapshot labyrinths! Suffixes are appended to disambiguate repeated quicksaves or replayed turns while preserving original filenames.
+- **SHA-256 Deduplication**: Identical save files consume zero duplicate disk space.
+- **Rich In-App Organization**: Tag, filter, and organize your saves without filesystem constraints. Mark crucial saves as **Pinned ⭐ Milestones** (which are protected forever against rolling retention limits), write lore notes, assign tags, and filter instantly between Pinned, Sentinel, Manual, and Safety backups.
+- **Campaign Chronologer & AAR Generator**: Turn your gameplay history into an epic saga. Aggregates your save history into a unified chronological timeline, lets you write journal entries, title milestones, add tags, and export publication-ready After Action Reports in styled HTML or Markdown.
+- **Autosave Sentinel (Background Watcher)**: Automatically creates snapshots in real time whenever Rome Remastered writes or updates a save to disk, complete with debouncing, file-lock protection, and single-file differential capture.
 - **System Tray & Desktop Integration**: Minimizes or closes to the Windows notification area, keeps the Autosave Sentinel running quietly while you game, provides balloon notifications, and includes a one-click Steam game launcher (`⚔ Launch Game`).
-- **Automatic Campaign & Faction Recognition**: Automatically identifies the faction or campaign name directly from savefile names (supporting Rome Remastered autosaves, manual hyphenated saves, direct faction names, and smart quicksave association).
-- **Faction-Sorted Backup Folders**: Backups are organized on disk into dedicated faction subfolders (e.g. `Rome Remastered Backups/Kingdom of Macedon/Backup_...`).
-- **Per-Campaign Retention**: When retention limits are enabled, snapshots are managed on a per-campaign basis — starting a new campaign will **not** purge backups of your older campaigns!
-- **Instant Active Campaign Backup**: One-click button to snapshot the campaign you are currently playing.
-- **Backup All Campaigns**: Back up every active campaign detected in your save folder in a single click.
-- **Automatic Detection**: Discovers your Rome Remastered save directory out-of-the-box (supports standard Feral Interactive folders and Steam userdata paths).
-- **Custom Named Checkpoints**: Label your backups (e.g. `Julii_Turn30_Invading_Gaul`, `Brutii_Before_Senate_Demands`).
+- **Self-Healing Index & 1-Click Migration**: If `vault.json` is ever lost, the app reconstructs it by scanning all on-disk `.sav` files with its parser. Automatically discovers and migrates legacy nested backup folders into the flat vault.
 - **Safety-First Restore**: Restoring a backup automatically creates a pre-restore safety copy first. You never risk losing your current save by rolling back.
-- **Optional ZIP Compression**: Save disk space by storing snapshots as `.zip` archives or keep them as plain folders.
-- **Accessible UI Polish**: Fully supports high-contrast accessible controls with customized dropdowns and responsive keyboard shortcuts.
-- **CLI & Scripting Ready**: Run unattended backups via commands or automate them before launching the game.
 
 ---
 
@@ -161,7 +155,9 @@ The **Autosave Sentinel** monitors your Rome Remastered game save folder in real
    - Whenever Rome Remastered saves the game (end of turn autosave, quicksave, or manual battle save), the Sentinel detects the file write.
    - It utilizes a customizable **debounce buffer** (default `1500 ms`) to let the game finish its multi-stage disk flush cleanly.
    - Built-in file lock retry logic (`WaitForFileAvailable`) safely waits for the game engine to release exclusive file locks before copying.
-   - The backup is immediately filed under the detected campaign folder and labeled `AutosaveSentinel_[Timestamp]`.
+   - **Targeted Storage-Efficient Snapshots**: Sentinel copies **only the specific save file(s)** that were written during that turn, rather than cloning every campaign save file. This saves up to 90% disk space per turn!
+   - Snapshots are automatically tagged with turn information (e.g. `Backup_YYYY-MM-DD_HH-mm-ss_AutosaveSentinel_Turn188`) and display a distinct cyan `SENTINEL` badge in the UI list.
+   - **Independent Rolling Pool**: Sentinel snapshots are managed by a separate rolling limit (`MaxSentinelBackupsToKeep`, default 15). Sentinel will **never** delete your manual checkpoints!
 2. **Interactive Header Pill & System Tray**:
    - Click the **`🛡 Sentinel: Active` / `🛡 Sentinel: Off`** badge in the window header to quickly toggle monitoring on and off.
    - When **Minimize to System Tray** is enabled, minimizing or clicking `[X]` to close the window will send the app to the Windows system tray. The Sentinel continues protecting your saves while you game in full screen!
@@ -216,6 +212,7 @@ Under the **Settings** tab, you can customize:
 | **Windows Notifications** | Displays balloon notifications when an automated background backup occurs. | Checked (`true`) |
 | **System Tray** | Minimizes/closes the app to the Windows tray so background monitoring continues uninterrupted. | Checked (`true`) |
 | **Save Detection Buffer** | Debounce delay in milliseconds before copying saves to guarantee file flushes are completed. | `1500 ms` |
+| **Sentinel Rolling Limit** | Max automated Sentinel snapshots to keep per campaign. Independent from manual backups. | `15` (0 = unlimited) |
 
 ---
 
@@ -294,35 +291,39 @@ Depending on your platform and Steam settings, the game typically stores saves i
   C:\Program Files (x86)\Steam\userdata\<YourSteamID>\885970\remote
   ```
 
-### Organized Backups Directory
-Backups are organized by faction under your backup directory:
+### Save Vault Directory (Flat Layout)
+All backups exist as discrete, standalone `.sav` files directly inside your backup folder matching the game's flat save directory structure alongside a central index (`vault.json`):
 ```text
 Rome Remastered Backups/
-├── Kingdom of Macedon/
-│   ├── Backup_2026-09-18_18-00-00/
-│   └── Backup_2026-09-18_19-30-00_Turn101/
-├── Pergamon/
-│   ├── Backup_2026-09-18_20-15-00/
-│   └── SafetyBackup_PreRestore_2026-09-18_20-45-00/
-└── General/
-    └── Backup_2026-09-18_21-00-00/
+├── vault.json                                                  <-- Metadata manifest & virtual organization
+├── save_Kingdom of Macedon - 101.sav                           <-- Direct game-ready save
+├── save_Quicksave.sav                                          <-- Initial quicksave
+├── save_Quicksave_2026-09-18_23-15-00.sav                      <-- Disambiguated quicksave revision
+├── save_Autosave   Byzantium   Turn 188.sav                    <-- Autosave checkpoint
+└── save_Autosave   Odrysian Kingdom   Turn 185 End.sav
 ```
 
 ---
 
 ## Frequently Asked Questions & Troubleshooting
 
-### 1. How does campaign sorting work if I play two different campaigns with the same faction?
-Because the game uses the faction name in the autosave format, saves from two separate campaigns playing the same faction (e.g., two Julii campaigns started at different times) will be placed in the same faction folder (`The House of Julii/`). You can use **Named Backup** to add custom tags (e.g. `Campaign2_Turn10`) to distinguish them.
+### 1. How does the flat Save Vault work?
+Unlike traditional backup tools that create endless subfolders (`Backup_YYYY-MM-DD_...`), the Save Vault keeps all your saves flat in one folder, exactly like the game's own save directory. Every file is a 100% valid `.sav` file ready to be copied into the game. All categorization (campaign, turn, notes, tags, pinned status) is managed virtually inside the app via `vault.json`.
 
-### 2. What happens to `save_Quicksave.sav`?
-`save_Quicksave.sav` does not include a faction name in its filename. The Save Manager intelligently checks the timestamps of active campaign saves in your folder and associates the quicksave with your current active campaign. If no active campaign can be determined, it is saved under `General`.
+### 2. How does deduplication work?
+Whenever a backup occurs, the Save Vault calculates the SHA-256 hash of the save file. If an identical file already exists in the vault, zero duplicate disk space is used. For automated Sentinel triggers, unchanged files are automatically skipped!
 
-### 3. Will my older campaigns be deleted when retention limit is reached?
-No! Retention limits are applied **per campaign**. If your retention limit is set to 5, you can have 5 backups for Macedon, 5 for Pergamon, and 5 for Rome without them overwriting each other.
+### 3. What happens to `save_Quicksave.sav` and repeated turn names?
+When you save a new quicksave or replay an autosave turn, the game reuses the filename `save_Quicksave.sav`. To preserve both historical versions on disk without overwriting, the vault appends a clean timestamp suffix (e.g. `save_Quicksave_2026-09-18_23-15-00.sav`). When restoring, the manager restores it under its original game name `save_Quicksave.sav`.
 
-### 4. Where are my Campaign Chronicle notes and AAR journals stored?
-Chronicle notes are saved in a JSON file (`chronicle.json`) directly inside that campaign's backup folder (`<BackupDirectory>/<CampaignName>/chronicle.json`). Because the file resides right alongside your snapshots, your lore, milestone headlines, and custom notes automatically travel with your backups if you copy or sync them to another machine.
+### 4. What does Pinning (⭐) do?
+Pinning a save marks it as a permanent milestone. Pinned saves are **never** deleted by rolling retention limits or storage cleanup assistants. Use pins for crucial turning points, victorious battles, or before embarking on risky wars!
+
+### 5. What if `vault.json` gets corrupted or deleted?
+No problem! The Save Vault includes a **Self-Healing Index**. Click **Rebuild Vault Index** in Settings (or run option `[7]` in the CLI). The manager scans all `.sav` files on disk, extracts the campaign and turn data, and recreates `vault.json` automatically.
+
+### 6. Can I migrate my existing nested backup folders?
+Yes! The Save Vault automatically migrates legacy nested folders on startup, or you can click **Migrate Legacy Folders** in the Settings tab. All nested `.sav` files are moved flat into the root vault and indexed into `vault.json`.
 
 ---
 

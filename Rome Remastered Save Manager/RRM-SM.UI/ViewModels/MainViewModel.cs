@@ -31,6 +31,18 @@ namespace RRM_SM.UI.ViewModels
         private ObservableCollection<string> _availableCampaignFilters = new() { "All Campaigns" };
         private string _selectedCampaignFilter = "All Campaigns";
 
+        private ObservableCollection<string> _vaultFilterOptions = new()
+        {
+            "All Saves",
+            "⭐ Pinned",
+            "🛡 Sentinel",
+            "💾 Manual",
+            "↩ Safety"
+        };
+        private string _selectedVaultFilter = "All Saves";
+
+        public Func<BackupEntry, bool>? EditSaveDialogRequested { get; set; }
+
         private ObservableCollection<string> _activeCampaigns = new();
         private string? _selectedActiveCampaign;
 
@@ -53,6 +65,7 @@ namespace RRM_SM.UI.ViewModels
         private string _backupDirectory = string.Empty;
         private bool _compressBackups;
         private int _maxBackupsToKeep;
+        private int _maxSentinelBackupsToKeep;
         private bool _gameSaveDirExists;
         private bool _backupDirExists;
         private int _totalBackupCount;
@@ -86,6 +99,7 @@ namespace RRM_SM.UI.ViewModels
             _showNotifications = _config.ShowNotifications;
             _minimizeToTray = _config.MinimizeToTray;
             _autoWatcherDebounceMs = _config.AutoWatcherDebounceMs > 0 ? _config.AutoWatcherDebounceMs : 1500;
+            _maxSentinelBackupsToKeep = _config.MaxSentinelBackupsToKeep;
 
             // Tray Service
             _trayService = new TrayService { ShowNotifications = _showNotifications };
@@ -150,6 +164,12 @@ namespace RRM_SM.UI.ViewModels
             ExportMarkdownReportCommand = new RelayCommand(ExecuteExportMarkdownReport, () => _currentChronicle != null);
             RefreshChronicleCommand = new RelayCommand(ExecuteRefreshChronicle, () => !string.IsNullOrEmpty(SelectedChronicleCampaign));
 
+            TogglePinCommand = new RelayCommand(ExecuteTogglePin);
+            EditSaveMetadataCommand = new RelayCommand(ExecuteEditSaveMetadata, () => SelectedBackup != null);
+            RebuildIndexCommand = new RelayCommand(ExecuteRebuildIndex, () => !IsBusy);
+            MigrateLegacyBackupsCommand = new RelayCommand(ExecuteMigrateLegacyBackups, () => !IsBusy);
+            CleanUnpinnedSentinelCommand = new RelayCommand(ExecuteCleanUnpinnedSentinel, () => !IsBusy);
+
             // Initial load
             RefreshPathStatuses();
             ExecuteRefreshBackups();
@@ -159,6 +179,11 @@ namespace RRM_SM.UI.ViewModels
                 _watcherService.Start();
             }
             _trayService.UpdateWatcherState(_watcherService.IsRunning);
+
+            if (_backupService.VaultService.HasLegacyBackups())
+            {
+                TriggerBackgroundLegacyMigration();
+            }
         }
 
         // ───────────────────── Properties ─────────────────────
@@ -185,6 +210,22 @@ namespace RRM_SM.UI.ViewModels
                 if (_selectedCampaignFilter != value)
                 {
                     _selectedCampaignFilter = value;
+                    OnPropertyChanged();
+                    ApplyFilter();
+                }
+            }
+        }
+
+        public ObservableCollection<string> VaultFilterOptions => _vaultFilterOptions;
+
+        public string SelectedVaultFilter
+        {
+            get => _selectedVaultFilter;
+            set
+            {
+                if (_selectedVaultFilter != value)
+                {
+                    _selectedVaultFilter = value;
                     OnPropertyChanged();
                     ApplyFilter();
                 }
@@ -261,6 +302,12 @@ namespace RRM_SM.UI.ViewModels
         {
             get => _maxBackupsToKeep;
             set { _maxBackupsToKeep = value; OnPropertyChanged(); }
+        }
+
+        public int MaxSentinelBackupsToKeep
+        {
+            get => _maxSentinelBackupsToKeep;
+            set { _maxSentinelBackupsToKeep = value; OnPropertyChanged(); }
         }
 
         public bool AutoWatcherEnabled
@@ -424,6 +471,12 @@ namespace RRM_SM.UI.ViewModels
         public ICommand ExportHtmlReportCommand { get; }
         public ICommand ExportMarkdownReportCommand { get; }
         public ICommand RefreshChronicleCommand { get; }
+
+        public ICommand TogglePinCommand { get; }
+        public ICommand EditSaveMetadataCommand { get; }
+        public ICommand RebuildIndexCommand { get; }
+        public ICommand MigrateLegacyBackupsCommand { get; }
+        public ICommand CleanUnpinnedSentinelCommand { get; }
 
         // ───────────────────── Backup Operations ─────────────────────
 
@@ -657,6 +710,157 @@ namespace RRM_SM.UI.ViewModels
             }
         }
 
+        private void ExecuteTogglePin(object? param)
+        {
+            var entry = param as BackupEntry ?? SelectedBackup;
+            if (entry == null || string.IsNullOrWhiteSpace(entry.VaultId)) return;
+
+            bool newPinned = _backupService.VaultService.TogglePin(entry.VaultId);
+            entry.IsPinned = newPinned;
+            StatusMessage = newPinned 
+                ? $"⭐ Pinned '{entry.Name}' as a permanent milestone."
+                : $"☆ Unpinned '{entry.Name}'.";
+
+            ExecuteRefreshBackups();
+        }
+
+        private void ExecuteEditSaveMetadata()
+        {
+            if (SelectedBackup == null) return;
+            var entry = SelectedBackup;
+
+            bool? result = EditSaveDialogRequested?.Invoke(entry);
+            if (result == true)
+            {
+                ExecuteRefreshBackups();
+                StatusMessage = $"✔ Updated metadata for '{entry.Name}'.";
+            }
+        }
+
+        public void UpdateSaveMetadata(string vaultId, string? title, string? notes, IEnumerable<string>? tags, bool isPinned)
+        {
+            _backupService.VaultService.UpdateMetadata(vaultId, title, notes, tags, isPinned);
+        }
+
+        private async void ExecuteRebuildIndex()
+        {
+            IsBusy = true;
+            StatusMessage = "Rebuilding vault index from disk...";
+            try
+            {
+                await Task.Run(() => _backupService.VaultService.RebuildIndexFromDisk());
+                ExecuteRefreshBackups();
+                StatusMessage = "✔ Save Vault index successfully rebuilt from disk.";
+                MessageBox.Show("Save Vault index has been rebuilt from all .sav files found in your backup directory.", "Vault Rebuilt", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"✖ Rebuild failed: {ex.Message}";
+                MessageBox.Show($"Rebuild failed:\n{ex.Message}", "Rebuild Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private async void ExecuteMigrateLegacyBackups()
+        {
+            IsBusy = true;
+            StatusMessage = "Migrating legacy nested backup folders into flat vault...";
+            try
+            {
+                int count = await Task.Run(() => _backupService.VaultService.MigrateLegacyBackups());
+                ExecuteRefreshBackups();
+                StatusMessage = $"✔ Migrated {count} legacy save file(s) into the flat vault.";
+                MessageBox.Show($"Successfully migrated {count} legacy backup file(s) into the flat save vault.\n\nLegacy directories have been merged into standalone game-ready .sav files.", "Migration Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"✖ Migration failed: {ex.Message}";
+                MessageBox.Show($"Migration failed:\n{ex.Message}", "Migration Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private void TriggerBackgroundLegacyMigration()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    Application.Current?.Dispatcher?.Invoke(() =>
+                    {
+                        StatusMessage = "⏳ Migrating legacy backup folders into flat vault in background...";
+                    });
+
+                    int count = _backupService.VaultService.MigrateLegacyBackups();
+                    if (count > 0)
+                    {
+                        Application.Current?.Dispatcher?.Invoke(() =>
+                        {
+                            ExecuteRefreshBackups();
+                            StatusMessage = $"✔ Migrated {count} legacy backup save(s) into flat vault.";
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Application.Current?.Dispatcher?.Invoke(() =>
+                    {
+                        StatusMessage = $"Legacy migration note: {ex.Message}";
+                    });
+                }
+            });
+        }
+
+        private async void ExecuteCleanUnpinnedSentinel()
+        {
+            var unpinnedSentinels = _allBackups.Where(b => b.IsSentinelBackup && !b.IsPinned).ToList();
+            if (unpinnedSentinels.Count == 0)
+            {
+                MessageBox.Show("There are no unpinned Sentinel snapshots to clean.", "Clean Storage", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            long totalBytes = unpinnedSentinels.Sum(b => b.TotalSizeBytes);
+            string formattedSize = FormatBytes(totalBytes);
+
+            var res = MessageBox.Show(
+                $"This will delete {unpinnedSentinels.Count} unpinned Sentinel snapshot(s), freeing {formattedSize} of disk space.\n\nAll Pinned (⭐) milestones and manual checkpoints will be kept safe.\n\nProceed?",
+                "Clean Storage",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (res != MessageBoxResult.Yes) return;
+
+            IsBusy = true;
+            StatusMessage = $"Cleaning {unpinnedSentinels.Count} unpinned Sentinel snapshots...";
+            try
+            {
+                await Task.Run(() =>
+                {
+                    foreach (var b in unpinnedSentinels)
+                    {
+                        _backupService.DeleteBackup(b);
+                    }
+                });
+                ExecuteRefreshBackups();
+                StatusMessage = $"✔ Storage cleaned: {unpinnedSentinels.Count} snapshots removed ({formattedSize} freed).";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"✖ Cleanup failed: {ex.Message}";
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
         // ───────────────────── Settings / Path Operations ─────────────────────
 
         private void ExecuteBrowseSaveDir()
@@ -786,6 +990,7 @@ namespace RRM_SM.UI.ViewModels
             BackupDirectory = Path.Combine(docs, "Rome Remastered Backups");
             CompressBackups = false;
             MaxBackupsToKeep = 0;
+            MaxSentinelBackupsToKeep = 15;
             AutoWatcherEnabled = false;
             ShowNotifications = true;
             MinimizeToTray = true;
@@ -902,6 +1107,7 @@ namespace RRM_SM.UI.ViewModels
             _config.BackupDirectory = BackupDirectory;
             _config.CompressBackups = CompressBackups;
             _config.MaxBackupsToKeep = MaxBackupsToKeep;
+            _config.MaxSentinelBackupsToKeep = MaxSentinelBackupsToKeep;
             _config.AutoWatcherEnabled = AutoWatcherEnabled;
             _config.ShowNotifications = ShowNotifications;
             _config.MinimizeToTray = MinimizeToTray;
@@ -925,12 +1131,36 @@ namespace RRM_SM.UI.ViewModels
                 query = query.Where(b => b.CampaignName.Equals(_selectedCampaignFilter, StringComparison.OrdinalIgnoreCase));
             }
 
-            // 2. Search Text
+            // 2. Vault Type Filter
+            if (!string.IsNullOrWhiteSpace(_selectedVaultFilter))
+            {
+                if (_selectedVaultFilter.Contains("Pinned"))
+                {
+                    query = query.Where(b => b.IsPinned);
+                }
+                else if (_selectedVaultFilter.Contains("Sentinel"))
+                {
+                    query = query.Where(b => b.IsSentinelBackup);
+                }
+                else if (_selectedVaultFilter.Contains("Manual"))
+                {
+                    query = query.Where(b => !b.IsSentinelBackup && !b.IsSafetyBackup);
+                }
+                else if (_selectedVaultFilter.Contains("Safety"))
+                {
+                    query = query.Where(b => b.IsSafetyBackup);
+                }
+            }
+
+            // 3. Search Text (Name, Campaign, Original Filename, Notes, Tags)
             if (!string.IsNullOrWhiteSpace(_searchFilter))
             {
                 query = query.Where(b =>
                     b.Name.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase) ||
-                    b.CampaignName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase));
+                    b.CampaignName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(b.OriginalGameFileName) && b.OriginalGameFileName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrWhiteSpace(b.Notes) && b.Notes.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase)) ||
+                    (b.Tags != null && b.Tags.Any(t => t.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase))));
             }
 
             FilteredBackups = new ObservableCollection<BackupEntry>(query.ToList());

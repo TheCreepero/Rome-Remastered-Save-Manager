@@ -5,18 +5,28 @@ namespace RRM_SM.Models
     public enum BackupType
     {
         Directory,
-        ZipArchive
+        ZipArchive,
+        SaveFile
     }
 
     public class BackupEntry
     {
+        public string? VaultId { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string OriginalGameFileName { get; set; } = string.Empty;
         public string FullPath { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public long TotalSizeBytes { get; set; }
         public int FileCount { get; set; }
         public BackupType Type { get; set; }
         public bool IsSafetyBackup { get; set; }
+        public bool IsSentinelBackup => Source == SaveSourceType.Sentinel || Name.IndexOf("Sentinel", StringComparison.OrdinalIgnoreCase) >= 0;
+        public bool IsPinned { get; set; }
+        public int? Turn { get; set; }
+        public string? Notes { get; set; }
+        public List<string> Tags { get; set; } = new();
+        public string TagsDisplay => Tags != null && Tags.Count > 0 ? string.Join(", ", Tags) : string.Empty;
+        public SaveSourceType Source { get; set; } = SaveSourceType.Manual;
         public string CampaignName { get; set; } = "General";
 
         public string FormattedSize
@@ -33,7 +43,15 @@ namespace RRM_SM.Models
             }
         }
 
-        public string TypeLabel => Type == BackupType.ZipArchive ? ".zip" : "Folder";
+        public string TypeLabel
+        {
+            get
+            {
+                if (Type == BackupType.ZipArchive) return ".zip";
+                if (Type == BackupType.SaveFile) return ".sav";
+                return "Folder";
+            }
+        }
     }
 }
 

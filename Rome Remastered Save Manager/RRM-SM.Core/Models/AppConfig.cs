@@ -12,6 +12,7 @@ namespace RRM_SM.Models
         public bool ShowNotifications { get; set; } = true;
         public bool MinimizeToTray { get; set; } = true;
         public int AutoWatcherDebounceMs { get; set; } = 1500;
+        public int MaxSentinelBackupsToKeep { get; set; } = 15; // 0 = unlimited, separate rolling retention for Sentinel
     }
 }
 

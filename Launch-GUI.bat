@@ -17,6 +17,6 @@ if not exist "%EXE_PATH%" (
 )
 
 :: Launch the UI detached so the terminal window doesn't stay open
-start "" "%EXE_PATH%"
+start "" /d "%~dp0" "%EXE_PATH%"
 exit /b 0
 
