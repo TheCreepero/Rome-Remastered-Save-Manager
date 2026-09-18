@@ -17,6 +17,7 @@ namespace RRM_SM.Models
         public int FileCount { get; set; }
         public BackupType Type { get; set; }
         public bool IsSafetyBackup { get; set; }
+        public string CampaignName { get; set; } = "General";
 
         public string FormattedSize
         {

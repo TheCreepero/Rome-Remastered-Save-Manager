@@ -21,6 +21,12 @@ namespace RRM_SM.UI.ViewModels
 
         private ObservableCollection<BackupEntry> _allBackups = new();
         private ObservableCollection<BackupEntry> _filteredBackups = new();
+        private ObservableCollection<string> _availableCampaignFilters = new() { "All Campaigns" };
+        private string _selectedCampaignFilter = "All Campaigns";
+
+        private ObservableCollection<string> _activeCampaigns = new();
+        private string? _selectedActiveCampaign;
+
         private BackupEntry? _selectedBackup;
         private string _searchFilter = string.Empty;
         private string _statusMessage = "Ready.";
@@ -51,6 +57,7 @@ namespace RRM_SM.UI.ViewModels
             // Commands
             QuickBackupCommand = new RelayCommand(ExecuteQuickBackup, () => !IsBusy);
             NamedBackupCommand = new RelayCommand(ExecuteNamedBackup, () => !IsBusy);
+            BackupAllCampaignsCommand = new RelayCommand(ExecuteBackupAllCampaigns, () => !IsBusy);
             RestoreCommand = new RelayCommand(ExecuteRestore, () => !IsBusy && SelectedBackup != null);
             DeleteBackupCommand = new RelayCommand(ExecuteDeleteBackup, () => !IsBusy && SelectedBackup != null);
             RefreshBackupsCommand = new RelayCommand(ExecuteRefreshBackups, () => !IsBusy);
@@ -76,6 +83,38 @@ namespace RRM_SM.UI.ViewModels
         {
             get => _filteredBackups;
             set { _filteredBackups = value; OnPropertyChanged(); }
+        }
+
+        public ObservableCollection<string> AvailableCampaignFilters
+        {
+            get => _availableCampaignFilters;
+            set { _availableCampaignFilters = value; OnPropertyChanged(); }
+        }
+
+        public string SelectedCampaignFilter
+        {
+            get => _selectedCampaignFilter;
+            set
+            {
+                if (_selectedCampaignFilter != value)
+                {
+                    _selectedCampaignFilter = value;
+                    OnPropertyChanged();
+                    ApplyFilter();
+                }
+            }
+        }
+
+        public ObservableCollection<string> ActiveCampaigns
+        {
+            get => _activeCampaigns;
+            set { _activeCampaigns = value; OnPropertyChanged(); }
+        }
+
+        public string? SelectedActiveCampaign
+        {
+            get => _selectedActiveCampaign;
+            set { _selectedActiveCampaign = value; OnPropertyChanged(); }
         }
 
         public BackupEntry? SelectedBackup
@@ -159,6 +198,7 @@ namespace RRM_SM.UI.ViewModels
 
         public ICommand QuickBackupCommand { get; }
         public ICommand NamedBackupCommand { get; }
+        public ICommand BackupAllCampaignsCommand { get; }
         public ICommand RestoreCommand { get; }
         public ICommand DeleteBackupCommand { get; }
         public ICommand RefreshBackupsCommand { get; }
@@ -176,13 +216,17 @@ namespace RRM_SM.UI.ViewModels
 
         private async void ExecuteQuickBackup()
         {
+            string targetCampaign = !string.IsNullOrWhiteSpace(SelectedActiveCampaign)
+                ? SelectedActiveCampaign
+                : _backupService.GetMostRecentCampaign();
+
             IsBusy = true;
-            StatusMessage = "Creating quick backup...";
+            StatusMessage = $"Creating quick backup for [{targetCampaign}]...";
             try
             {
                 SyncConfigFromViewModel();
-                var entry = await Task.Run(() => _backupService.CreateBackup());
-                StatusMessage = $"✔ Backup created: {entry.Name} ({entry.FormattedSize}, {entry.FileCount} files)";
+                var entry = await Task.Run(() => _backupService.CreateCampaignBackup(targetCampaign));
+                StatusMessage = $"✔ Backup created: {entry.CampaignName}/{entry.Name} ({entry.FormattedSize}, {entry.FileCount} files)";
                 ExecuteRefreshBackups();
             }
             catch (Exception ex)
@@ -198,18 +242,21 @@ namespace RRM_SM.UI.ViewModels
 
         private async void ExecuteNamedBackup()
         {
-            // Prompt for name via a simple input dialog
-            string? name = PromptForInput("Named Backup", "Enter a tag / custom name for this backup\n(e.g. 'Julii_Turn42', 'Before_Civil_War'):");
+            string targetCampaign = !string.IsNullOrWhiteSpace(SelectedActiveCampaign)
+                ? SelectedActiveCampaign
+                : _backupService.GetMostRecentCampaign();
+
+            string? name = PromptForInput("Named Backup", $"Enter a tag / custom name for [{targetCampaign}] backup\n(e.g. 'Turn42_Siege', 'Before_Civil_War'):");
             if (string.IsNullOrWhiteSpace(name))
                 return;
 
             IsBusy = true;
-            StatusMessage = $"Creating backup '{name}'...";
+            StatusMessage = $"Creating backup '{name}' for [{targetCampaign}]...";
             try
             {
                 SyncConfigFromViewModel();
-                var entry = await Task.Run(() => _backupService.CreateBackup(name));
-                StatusMessage = $"✔ Named backup created: {entry.Name} ({entry.FormattedSize})";
+                var entry = await Task.Run(() => _backupService.CreateCampaignBackup(targetCampaign, name));
+                StatusMessage = $"✔ Named backup created: {entry.CampaignName}/{entry.Name} ({entry.FormattedSize})";
                 ExecuteRefreshBackups();
             }
             catch (Exception ex)
@@ -223,13 +270,35 @@ namespace RRM_SM.UI.ViewModels
             }
         }
 
+        private async void ExecuteBackupAllCampaigns()
+        {
+            IsBusy = true;
+            StatusMessage = "Backing up all detected campaigns...";
+            try
+            {
+                SyncConfigFromViewModel();
+                var entries = await Task.Run(() => _backupService.CreateAllCampaignsBackup());
+                StatusMessage = $"✔ Backed up {entries.Count} campaign(s) successfully.";
+                ExecuteRefreshBackups();
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"✖ Backup all failed: {ex.Message}";
+                MessageBox.Show($"Backup all failed:\n{ex.Message}", "Backup Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
         private async void ExecuteRestore()
         {
             if (SelectedBackup == null) return;
 
             var chosen = SelectedBackup;
             var result = MessageBox.Show(
-                $"This will overwrite files in your active save directory with:\n\n{chosen.Name}\n\nA safety backup of your current saves will be created first.\n\nAre you sure you want to proceed?",
+                $"This will restore files for campaign [{chosen.CampaignName}] into your active save directory:\n\n{chosen.Name}\n\nA safety backup of your current saves will be created first.\n\nAre you sure you want to proceed?",
                 "Confirm Restore",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
@@ -238,12 +307,12 @@ namespace RRM_SM.UI.ViewModels
                 return;
 
             IsBusy = true;
-            StatusMessage = "Creating safety backup & restoring...";
+            StatusMessage = $"Creating safety backup & restoring [{chosen.CampaignName}]...";
             try
             {
                 SyncConfigFromViewModel();
                 await Task.Run(() => _backupService.RestoreBackup(chosen, createSafetyBackup: true));
-                StatusMessage = $"✔ Restored: {chosen.Name} (safety backup created)";
+                StatusMessage = $"✔ Restored: {chosen.CampaignName}/{chosen.Name} (safety backup created)";
                 ExecuteRefreshBackups();
             }
             catch (Exception ex)
@@ -263,7 +332,7 @@ namespace RRM_SM.UI.ViewModels
 
             var chosen = SelectedBackup;
             var result = MessageBox.Show(
-                $"Permanently delete backup:\n\n{chosen.Name}\n({chosen.FormattedSize})\n\nThis cannot be undone.",
+                $"Permanently delete backup:\n\n{chosen.CampaignName} / {chosen.Name}\n({chosen.FormattedSize})\n\nThis cannot be undone.",
                 "Confirm Deletion",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
@@ -294,8 +363,37 @@ namespace RRM_SM.UI.ViewModels
             try
             {
                 SyncConfigFromViewModel();
+
+                // 1. Refresh active campaigns detected in the game save folder
+                var activeDict = _backupService.GetActiveCampaigns();
+                var activeList = activeDict.Keys.OrderBy(k => k).ToList();
+                ActiveCampaigns = new ObservableCollection<string>(activeList);
+
+                string mostRecent = _backupService.GetMostRecentCampaign();
+                if (SelectedActiveCampaign == null || !activeList.Contains(SelectedActiveCampaign))
+                {
+                    SelectedActiveCampaign = activeList.Contains(mostRecent) ? mostRecent : activeList.FirstOrDefault();
+                }
+
+                // 2. Refresh backup entries
                 var backups = _backupService.GetBackups();
                 _allBackups = new ObservableCollection<BackupEntry>(backups);
+
+                // 3. Update campaign filters list
+                var distinctCampaigns = backups.Select(b => b.CampaignName).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(k => k).ToList();
+                var filterList = new ObservableCollection<string> { "All Campaigns" };
+                foreach (var c in distinctCampaigns)
+                {
+                    filterList.Add(c);
+                }
+                AvailableCampaignFilters = filterList;
+
+                if (!filterList.Contains(SelectedCampaignFilter))
+                {
+                    _selectedCampaignFilter = "All Campaigns";
+                    OnPropertyChanged(nameof(SelectedCampaignFilter));
+                }
+
                 ApplyFilter();
                 TotalBackupCount = backups.Count;
                 long total = backups.Sum(b => b.TotalSizeBytes);
@@ -421,17 +519,24 @@ namespace RRM_SM.UI.ViewModels
 
         private void ApplyFilter()
         {
-            if (string.IsNullOrWhiteSpace(_searchFilter))
+            var query = _allBackups.AsEnumerable();
+
+            // 1. Campaign Filter
+            if (!string.IsNullOrWhiteSpace(_selectedCampaignFilter) &&
+                !_selectedCampaignFilter.Equals("All Campaigns", StringComparison.OrdinalIgnoreCase))
             {
-                FilteredBackups = new ObservableCollection<BackupEntry>(_allBackups);
+                query = query.Where(b => b.CampaignName.Equals(_selectedCampaignFilter, StringComparison.OrdinalIgnoreCase));
             }
-            else
+
+            // 2. Search Text
+            if (!string.IsNullOrWhiteSpace(_searchFilter))
             {
-                var filtered = _allBackups
-                    .Where(b => b.Name.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                FilteredBackups = new ObservableCollection<BackupEntry>(filtered);
+                query = query.Where(b =>
+                    b.Name.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase) ||
+                    b.CampaignName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase));
             }
+
+            FilteredBackups = new ObservableCollection<BackupEntry>(query.ToList());
         }
 
         private static void OpenPathInExplorer(string path)
@@ -441,7 +546,6 @@ namespace RRM_SM.UI.ViewModels
             {
                 if (File.Exists(path))
                 {
-                    // Select the file in Explorer
                     Process.Start("explorer.exe", $"/select,\"{path}\"");
                 }
                 else if (Directory.Exists(path))
@@ -462,16 +566,12 @@ namespace RRM_SM.UI.ViewModels
             if (bytes >= 1024L * 1024 * 1024)
                 return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
             if (bytes >= 1024 * 1024)
-                return $"{bytes / (1024.0 * 1024):F2} MB";
+                return $"{bytes / (1024.0 * 1024 * 1024):F2} MB";
             if (bytes >= 1024)
                 return $"{bytes / 1024.0:F2} KB";
             return $"{bytes} B";
         }
 
-        /// <summary>
-        /// Simple input prompt using a MessageBox-style approach.
-        /// The actual input dialog is implemented in code-behind via an event.
-        /// </summary>
         public Func<string, string, string?>? InputDialogRequested { get; set; }
 
         private string? PromptForInput(string title, string message)
@@ -479,17 +579,12 @@ namespace RRM_SM.UI.ViewModels
             return InputDialogRequested?.Invoke(title, message);
         }
 
-        /// <summary>
-        /// Folder browser callback. Set from code-behind.
-        /// </summary>
         public Func<string, string, string?>? FolderBrowserRequested { get; set; }
 
         private string? BrowseForFolder(string title, string initialDir)
         {
             return FolderBrowserRequested?.Invoke(title, initialDir);
         }
-
-        // ───────────────────── INotifyPropertyChanged ─────────────────────
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -499,4 +594,3 @@ namespace RRM_SM.UI.ViewModels
         }
     }
 }
-

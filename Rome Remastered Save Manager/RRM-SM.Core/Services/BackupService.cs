@@ -10,13 +10,49 @@ namespace RRM_SM.Services
     public class BackupService
     {
         private readonly AppConfig _config;
+        private readonly CampaignParserService _parserService = new();
 
         public BackupService(AppConfig config)
         {
             _config = config;
         }
 
+        public CampaignParserService ParserService => _parserService;
+
+        public Dictionary<string, List<CampaignSaveInfo>> GetActiveCampaigns()
+        {
+            if (string.IsNullOrWhiteSpace(_config.GameSaveDirectory) || !Directory.Exists(_config.GameSaveDirectory))
+            {
+                return new Dictionary<string, List<CampaignSaveInfo>>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var saveFiles = Directory.GetFiles(_config.GameSaveDirectory, "*.sav", SearchOption.TopDirectoryOnly);
+            return _parserService.GroupSaveFiles(saveFiles);
+        }
+
+        public string GetMostRecentCampaign()
+        {
+            var campaigns = GetActiveCampaigns();
+            if (campaigns.Count == 0)
+            {
+                return "General";
+            }
+
+            var mostRecent = campaigns
+                .SelectMany(kv => kv.Value.Select(s => new { Campaign = kv.Key, s.LastModified }))
+                .OrderByDescending(x => x.LastModified)
+                .FirstOrDefault();
+
+            return mostRecent?.Campaign ?? campaigns.Keys.First();
+        }
+
         public BackupEntry CreateBackup(string? customName = null, bool isSafetyBackup = false)
+        {
+            string campaign = GetMostRecentCampaign();
+            return CreateCampaignBackup(campaign, customName, isSafetyBackup);
+        }
+
+        public BackupEntry CreateCampaignBackup(string campaignName, string? customName = null, bool isSafetyBackup = false)
         {
             if (string.IsNullOrWhiteSpace(_config.GameSaveDirectory) || !Directory.Exists(_config.GameSaveDirectory))
             {
@@ -28,24 +64,55 @@ namespace RRM_SM.Services
                 Directory.CreateDirectory(_config.BackupDirectory);
             }
 
+            string cleanCampaign = CampaignParserService.CleanFactionName(campaignName);
+            string campaignTargetDir = Path.Combine(_config.BackupDirectory, cleanCampaign);
+            if (!Directory.Exists(campaignTargetDir))
+            {
+                Directory.CreateDirectory(campaignTargetDir);
+            }
+
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
             string prefix = isSafetyBackup ? "SafetyBackup_PreRestore" : "Backup";
-            string folderName;
+            string baseFolderName;
 
             if (!string.IsNullOrWhiteSpace(customName))
             {
                 string safeCustomName = SanitizeFileName(customName);
-                folderName = $"{prefix}_{timestamp}_{safeCustomName}";
+                baseFolderName = $"{prefix}_{timestamp}_{safeCustomName}";
             }
             else
             {
-                folderName = $"{prefix}_{timestamp}";
+                baseFolderName = $"{prefix}_{timestamp}";
+            }
+
+            // Get save files belonging to this campaign
+            var activeCampaigns = GetActiveCampaigns();
+            List<CampaignSaveInfo> targetSaves;
+            if (activeCampaigns.TryGetValue(campaignName, out var saves) && saves.Count > 0)
+            {
+                targetSaves = saves;
+            }
+            else
+            {
+                // Fallback: all saves in root directory
+                var allSaves = Directory.GetFiles(_config.GameSaveDirectory, "*.sav", SearchOption.TopDirectoryOnly);
+                targetSaves = allSaves.Select(_parserService.ParseSaveFile).ToList();
             }
 
             if (_config.CompressBackups)
             {
-                string zipPath = Path.Combine(_config.BackupDirectory, folderName + ".zip");
-                ZipFile.CreateFromDirectory(_config.GameSaveDirectory, zipPath, CompressionLevel.Optimal, false);
+                string zipPath = Path.Combine(campaignTargetDir, baseFolderName + ".zip");
+                using (var zipStream = new FileStream(zipPath, FileMode.Create))
+                using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create))
+                {
+                    foreach (var save in targetSaves)
+                    {
+                        if (File.Exists(save.FilePath))
+                        {
+                            archive.CreateEntryFromFile(save.FilePath, Path.GetFileName(save.FilePath));
+                        }
+                    }
+                }
 
                 var fileInfo = new FileInfo(zipPath);
                 int count = 0;
@@ -54,39 +121,71 @@ namespace RRM_SM.Services
                     count = archive.Entries.Count;
                 }
 
-                EnforceRetentionLimit();
+                EnforceRetentionLimit(cleanCampaign);
 
                 return new BackupEntry
                 {
-                    Name = folderName + ".zip",
+                    Name = baseFolderName + ".zip",
                     FullPath = zipPath,
                     CreatedAt = fileInfo.CreationTime,
                     TotalSizeBytes = fileInfo.Length,
                     FileCount = count,
                     Type = BackupType.ZipArchive,
-                    IsSafetyBackup = isSafetyBackup
+                    IsSafetyBackup = isSafetyBackup,
+                    CampaignName = cleanCampaign
                 };
             }
             else
             {
-                string destinationDir = Path.Combine(_config.BackupDirectory, folderName);
-                CopyDirectoryRecursive(_config.GameSaveDirectory, destinationDir);
+                string destinationDir = Path.Combine(campaignTargetDir, baseFolderName);
+                if (!Directory.Exists(destinationDir))
+                {
+                    Directory.CreateDirectory(destinationDir);
+                }
+
+                foreach (var save in targetSaves)
+                {
+                    if (File.Exists(save.FilePath))
+                    {
+                        string destFile = Path.Combine(destinationDir, Path.GetFileName(save.FilePath));
+                        File.Copy(save.FilePath, destFile, true);
+                    }
+                }
 
                 var (fileCount, totalBytes) = CalculateDirectoryStats(destinationDir);
 
-                EnforceRetentionLimit();
+                EnforceRetentionLimit(cleanCampaign);
 
                 return new BackupEntry
                 {
-                    Name = folderName,
+                    Name = baseFolderName,
                     FullPath = destinationDir,
                     CreatedAt = DateTime.Now,
                     TotalSizeBytes = totalBytes,
                     FileCount = fileCount,
                     Type = BackupType.Directory,
-                    IsSafetyBackup = isSafetyBackup
+                    IsSafetyBackup = isSafetyBackup,
+                    CampaignName = cleanCampaign
                 };
             }
+        }
+
+        public List<BackupEntry> CreateAllCampaignsBackup(string? customName = null, bool isSafetyBackup = false)
+        {
+            var results = new List<BackupEntry>();
+            var active = GetActiveCampaigns();
+            if (active.Count == 0)
+            {
+                results.Add(CreateBackup(customName, isSafetyBackup));
+                return results;
+            }
+
+            foreach (var campaign in active.Keys)
+            {
+                results.Add(CreateCampaignBackup(campaign, customName, isSafetyBackup));
+            }
+
+            return results;
         }
 
         public List<BackupEntry> GetBackups()
@@ -98,27 +197,81 @@ namespace RRM_SM.Services
                 return backups;
             }
 
-            // Folder-based snapshots
-            foreach (string dir in Directory.GetDirectories(_config.BackupDirectory))
+            // 1. Scan campaign subdirectories (<BackupDirectory>/<CampaignName>/...)
+            foreach (string subDir in Directory.GetDirectories(_config.BackupDirectory))
             {
-                var dirInfo = new DirectoryInfo(dir);
+                var dirInfo = new DirectoryInfo(subDir);
+                // If this is a direct backup folder at the root level (legacy)
                 if (dirInfo.Name.StartsWith("Backup_") || dirInfo.Name.StartsWith("SafetyBackup_"))
                 {
-                    var (count, size) = CalculateDirectoryStats(dir);
+                    var (count, size) = CalculateDirectoryStats(subDir);
                     backups.Add(new BackupEntry
                     {
                         Name = dirInfo.Name,
-                        FullPath = dir,
+                        FullPath = subDir,
                         CreatedAt = dirInfo.CreationTime,
                         TotalSizeBytes = size,
                         FileCount = count,
                         Type = BackupType.Directory,
-                        IsSafetyBackup = dirInfo.Name.StartsWith("SafetyBackup_")
+                        IsSafetyBackup = dirInfo.Name.StartsWith("SafetyBackup_"),
+                        CampaignName = "General"
                     });
+                }
+                else
+                {
+                    // This is a campaign folder! Scan inside for snapshots
+                    string campaignName = dirInfo.Name;
+
+                    foreach (string childDir in Directory.GetDirectories(subDir))
+                    {
+                        var childDirInfo = new DirectoryInfo(childDir);
+                        if (childDirInfo.Name.StartsWith("Backup_") || childDirInfo.Name.StartsWith("SafetyBackup_"))
+                        {
+                            var (count, size) = CalculateDirectoryStats(childDir);
+                            backups.Add(new BackupEntry
+                            {
+                                Name = childDirInfo.Name,
+                                FullPath = childDir,
+                                CreatedAt = childDirInfo.CreationTime,
+                                TotalSizeBytes = size,
+                                FileCount = count,
+                                Type = BackupType.Directory,
+                                IsSafetyBackup = childDirInfo.Name.StartsWith("SafetyBackup_"),
+                                CampaignName = campaignName
+                            });
+                        }
+                    }
+
+                    foreach (string zipFile in Directory.GetFiles(subDir, "*.zip"))
+                    {
+                        var zipInfo = new FileInfo(zipFile);
+                        if (zipInfo.Name.StartsWith("Backup_") || zipInfo.Name.StartsWith("SafetyBackup_"))
+                        {
+                            int count = 0;
+                            try
+                            {
+                                using var archive = ZipFile.OpenRead(zipFile);
+                                count = archive.Entries.Count;
+                            }
+                            catch { }
+
+                            backups.Add(new BackupEntry
+                            {
+                                Name = zipInfo.Name,
+                                FullPath = zipFile,
+                                CreatedAt = zipInfo.CreationTime,
+                                TotalSizeBytes = zipInfo.Length,
+                                FileCount = count,
+                                Type = BackupType.ZipArchive,
+                                IsSafetyBackup = zipInfo.Name.StartsWith("SafetyBackup_"),
+                                CampaignName = campaignName
+                            });
+                        }
+                    }
                 }
             }
 
-            // Zip-based snapshots
+            // 2. Scan root-level zip archives (legacy)
             foreach (string file in Directory.GetFiles(_config.BackupDirectory, "*.zip"))
             {
                 var fileInfo = new FileInfo(file);
@@ -130,10 +283,7 @@ namespace RRM_SM.Services
                         using var archive = ZipFile.OpenRead(file);
                         count = archive.Entries.Count;
                     }
-                    catch
-                    {
-                        // In case of corrupt zip
-                    }
+                    catch { }
 
                     backups.Add(new BackupEntry
                     {
@@ -143,7 +293,8 @@ namespace RRM_SM.Services
                         TotalSizeBytes = fileInfo.Length,
                         FileCount = count,
                         Type = BackupType.ZipArchive,
-                        IsSafetyBackup = fileInfo.Name.StartsWith("SafetyBackup_")
+                        IsSafetyBackup = fileInfo.Name.StartsWith("SafetyBackup_"),
+                        CampaignName = "General"
                     });
                 }
             }
@@ -161,10 +312,11 @@ namespace RRM_SM.Services
             // 1. Create a safety backup of existing saves before overwriting
             if (createSafetyBackup && Directory.Exists(_config.GameSaveDirectory))
             {
-                var sourceFiles = Directory.GetFiles(_config.GameSaveDirectory, "*", SearchOption.AllDirectories);
+                var sourceFiles = Directory.GetFiles(_config.GameSaveDirectory, "*.sav", SearchOption.TopDirectoryOnly);
                 if (sourceFiles.Length > 0)
                 {
-                    CreateBackup(null, isSafetyBackup: true);
+                    // Create safety backup for the campaign being restored
+                    CreateCampaignBackup(backup.CampaignName, null, isSafetyBackup: true);
                 }
             }
 
@@ -187,28 +339,70 @@ namespace RRM_SM.Services
 
         public void DeleteBackup(BackupEntry backup)
         {
+            string? parentDir = null;
+
             if (backup.Type == BackupType.ZipArchive && File.Exists(backup.FullPath))
             {
+                parentDir = Path.GetDirectoryName(backup.FullPath);
                 File.Delete(backup.FullPath);
             }
             else if (backup.Type == BackupType.Directory && Directory.Exists(backup.FullPath))
             {
+                parentDir = Path.GetDirectoryName(backup.FullPath);
                 Directory.Delete(backup.FullPath, true);
+            }
+
+            // Clean up empty campaign folder if it has no more snapshots
+            if (!string.IsNullOrEmpty(parentDir) &&
+                !parentDir.Equals(_config.BackupDirectory, StringComparison.OrdinalIgnoreCase) &&
+                Directory.Exists(parentDir))
+            {
+                bool hasFiles = Directory.EnumerateFileSystemEntries(parentDir).Any();
+                if (!hasFiles)
+                {
+                    try { Directory.Delete(parentDir); } catch { }
+                }
             }
         }
 
-        public void EnforceRetentionLimit()
+        public void EnforceRetentionLimit(string? specificCampaign = null)
         {
             if (_config.MaxBackupsToKeep <= 0)
                 return;
 
-            var userBackups = GetBackups().Where(b => !b.IsSafetyBackup).ToList();
-            if (userBackups.Count > _config.MaxBackupsToKeep)
+            var allBackups = GetBackups().Where(b => !b.IsSafetyBackup).ToList();
+
+            if (!string.IsNullOrWhiteSpace(specificCampaign))
             {
-                var toRemove = userBackups.Skip(_config.MaxBackupsToKeep);
-                foreach (var old in toRemove)
+                var campaignBackups = allBackups
+                    .Where(b => b.CampaignName.Equals(specificCampaign, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(b => b.CreatedAt)
+                    .ToList();
+
+                if (campaignBackups.Count > _config.MaxBackupsToKeep)
                 {
-                    DeleteBackup(old);
+                    var toRemove = campaignBackups.Skip(_config.MaxBackupsToKeep);
+                    foreach (var old in toRemove)
+                    {
+                        DeleteBackup(old);
+                    }
+                }
+            }
+            else
+            {
+                // Enforce across each campaign group independently
+                var grouped = allBackups.GroupBy(b => b.CampaignName, StringComparer.OrdinalIgnoreCase);
+                foreach (var group in grouped)
+                {
+                    var sorted = group.OrderByDescending(b => b.CreatedAt).ToList();
+                    if (sorted.Count > _config.MaxBackupsToKeep)
+                    {
+                        var toRemove = sorted.Skip(_config.MaxBackupsToKeep);
+                        foreach (var old in toRemove)
+                        {
+                            DeleteBackup(old);
+                        }
+                    }
                 }
             }
         }
@@ -252,4 +446,3 @@ namespace RRM_SM.Services
         }
     }
 }
-

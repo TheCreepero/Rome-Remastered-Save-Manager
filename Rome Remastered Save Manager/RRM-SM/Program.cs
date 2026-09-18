@@ -35,7 +35,7 @@ namespace RRM_SM
                 PrintMainMenu();
 
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("\nSelect an option [0-7]: ");
+                Console.Write("\nSelect an option [0-8]: ");
                 Console.ResetColor();
 
                 string? choice = Console.ReadLine()?.Trim();
@@ -47,21 +47,24 @@ namespace RRM_SM
                         PerformQuickBackup();
                         break;
                     case "2":
-                        PerformNamedBackup();
+                        PerformBackupAllCampaigns();
                         break;
                     case "3":
-                        PerformRestore();
+                        PerformNamedBackup();
                         break;
                     case "4":
-                        ViewBackupsList();
+                        PerformRestore();
                         break;
                     case "5":
-                        OpenFolderInExplorer(_config.GameSaveDirectory, "Game Save Folder");
+                        ViewBackupsList();
                         break;
                     case "6":
-                        OpenFolderInExplorer(_config.BackupDirectory, "Backup Folder");
+                        OpenFolderInExplorer(_config.GameSaveDirectory, "Game Save Folder");
                         break;
                     case "7":
+                        OpenFolderInExplorer(_config.BackupDirectory, "Backup Folder");
+                        break;
+                    case "8":
                         ManageSettings();
                         break;
                     case "0":
@@ -71,7 +74,7 @@ namespace RRM_SM
                         Console.WriteLine("Exiting Rome Remastered Save Manager. Valete!");
                         break;
                     default:
-                        PrintColored("Invalid selection. Please enter a number between 0 and 7.", ConsoleColor.Red);
+                        PrintColored("Invalid selection. Please enter a number between 0 and 8.", ConsoleColor.Red);
                         WaitForKey();
                         break;
                 }
@@ -104,9 +107,33 @@ namespace RRM_SM
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.Write(_config.CompressBackups ? "Compressed (.zip)" : "Folder Snapshots");
             Console.ForegroundColor = ConsoleColor.Gray;
-            Console.Write(" | Max Backups: ");
+            Console.Write(" | Max Backups (per campaign): ");
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine(_config.MaxBackupsToKeep > 0 ? _config.MaxBackupsToKeep.ToString() : "Unlimited");
+
+            // Detected Active Campaigns
+            if (saveDirExists)
+            {
+                var activeDict = _backupService.GetActiveCampaigns();
+                string mostRecent = _backupService.GetMostRecentCampaign();
+
+                Console.ForegroundColor = ConsoleColor.Gray;
+                Console.Write("  Active Factions  : ");
+                if (activeDict.Count > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine(string.Join(", ", activeDict.Keys.Take(5)) + (activeDict.Count > 5 ? $" (+{activeDict.Count - 5} more)" : ""));
+                    Console.ForegroundColor = ConsoleColor.Gray;
+                    Console.Write("  Most Recent Play : ");
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine(mostRecent);
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine("None detected in save folder.");
+                }
+            }
 
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             Console.WriteLine("--------------------------------------------------------------------------------");
@@ -115,14 +142,17 @@ namespace RRM_SM
 
         private static void PrintMainMenu()
         {
+            string mostRecent = _backupService.GetMostRecentCampaign();
+
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("  [1] Quick Backup (Timestamped snapshot of all active saves)");
-            Console.WriteLine("  [2] Named Backup (Tag snapshot e.g. 'Turn 50 Before Siege')");
-            Console.WriteLine("  [3] Restore Backup (Restore a saved state with safety fallback)");
-            Console.WriteLine("  [4] List All Backups");
-            Console.WriteLine("  [5] Open Active Saves in File Explorer");
-            Console.WriteLine("  [6] Open Backup Directory in File Explorer");
-            Console.WriteLine("  [7] Configuration & Settings");
+            Console.WriteLine($"  [1] Quick Backup       - Snapshot most recent campaign [{mostRecent}]");
+            Console.WriteLine("  [2] Backup All         - Snapshot all active campaigns into faction folders");
+            Console.WriteLine("  [3] Named Backup       - Snapshot a chosen campaign with a custom label");
+            Console.WriteLine("  [4] Restore Backup     - Restore past campaign state with safety backup");
+            Console.WriteLine("  [5] List All Backups   - View existing snapshots grouped by faction");
+            Console.WriteLine("  [6] Open Active Saves  - Reveal save folder in File Explorer");
+            Console.WriteLine("  [7] Open Backup Folder - Reveal backup folder in File Explorer");
+            Console.WriteLine("  [8] Settings           - Configure folders, compression, retention");
             Console.WriteLine("  [0] Exit");
             Console.ResetColor();
         }
@@ -131,9 +161,10 @@ namespace RRM_SM
         {
             try
             {
-                PrintColored("--> Starting Quick Backup...", ConsoleColor.Cyan);
-                var entry = _backupService.CreateBackup();
-                PrintColored($"✔ Backup created successfully: {entry.Name}", ConsoleColor.Green);
+                string mostRecent = _backupService.GetMostRecentCampaign();
+                PrintColored($"--> Starting Quick Backup for campaign [{mostRecent}]...", ConsoleColor.Cyan);
+                var entry = _backupService.CreateCampaignBackup(mostRecent);
+                PrintColored($"✔ Backup created: {entry.CampaignName} / {entry.Name}", ConsoleColor.Green);
                 Console.WriteLine($"   Files: {entry.FileCount} | Total Size: {entry.FormattedSize}");
                 Console.WriteLine($"   Location: {entry.FullPath}");
             }
@@ -144,9 +175,47 @@ namespace RRM_SM
             WaitForKey();
         }
 
+        private static void PerformBackupAllCampaigns()
+        {
+            try
+            {
+                PrintColored("--> Backing up all detected active campaigns...", ConsoleColor.Cyan);
+                var entries = _backupService.CreateAllCampaignsBackup();
+                PrintColored($"✔ Successfully created {entries.Count} campaign backup(s):", ConsoleColor.Green);
+                foreach (var e in entries)
+                {
+                    Console.WriteLine($"   • [{e.CampaignName}] -> {e.Name} ({e.FormattedSize})");
+                }
+            }
+            catch (Exception ex)
+            {
+                PrintColored($"✖ Backup all failed: {ex.Message}", ConsoleColor.Red);
+            }
+            WaitForKey();
+        }
+
         private static void PerformNamedBackup()
         {
-            Console.Write("Enter a tag / custom name for this backup (e.g. 'Julii_Turn42'): ");
+            var active = _backupService.GetActiveCampaigns();
+            string selectedCampaign = _backupService.GetMostRecentCampaign();
+
+            if (active.Count > 1)
+            {
+                Console.WriteLine("Active Campaigns detected:");
+                var keys = active.Keys.ToList();
+                for (int i = 0; i < keys.Count; i++)
+                {
+                    Console.WriteLine($"  [{i + 1}] {keys[i]} ({active[keys[i]].Count} saves)");
+                }
+                Console.Write($"\nSelect campaign [1-{keys.Count}] or press Enter for default [{selectedCampaign}]: ");
+                string? input = Console.ReadLine()?.Trim();
+                if (!string.IsNullOrEmpty(input) && int.TryParse(input, out int sel) && sel >= 1 && sel <= keys.Count)
+                {
+                    selectedCampaign = keys[sel - 1];
+                }
+            }
+
+            Console.Write($"\nEnter a custom label for [{selectedCampaign}] (e.g. 'Turn50_Siege'): ");
             string? name = Console.ReadLine()?.Trim();
 
             if (string.IsNullOrWhiteSpace(name))
@@ -158,9 +227,9 @@ namespace RRM_SM
 
             try
             {
-                PrintColored($"--> Creating backup '{name}'...", ConsoleColor.Cyan);
-                var entry = _backupService.CreateBackup(name);
-                PrintColored($"✔ Named backup created: {entry.Name}", ConsoleColor.Green);
+                PrintColored($"--> Creating backup '{name}' for campaign [{selectedCampaign}]...", ConsoleColor.Cyan);
+                var entry = _backupService.CreateCampaignBackup(selectedCampaign, name);
+                PrintColored($"✔ Named backup created: {entry.CampaignName} / {entry.Name}", ConsoleColor.Green);
                 Console.WriteLine($"   Files: {entry.FileCount} | Total Size: {entry.FormattedSize}");
                 Console.WriteLine($"   Location: {entry.FullPath}");
             }
@@ -185,15 +254,15 @@ namespace RRM_SM
             Console.WriteLine($"Found {backups.Count} backup(s):\n");
             Console.ResetColor();
 
-            Console.WriteLine($"{"#",-4} {"Date / Time",-20} {"Size",-12} {"Files",-7} {"Name"}");
-            Console.WriteLine(new string('-', 78));
+            Console.WriteLine($"{"#",-4} {"Campaign / Faction",-22} {"Date / Time",-20} {"Size",-10} {"Files",-6} {"Name"}");
+            Console.WriteLine(new string('-', 95));
 
             for (int i = 0; i < backups.Count; i++)
             {
                 var b = backups[i];
                 string marker = b.IsSafetyBackup ? "[SAFETY] " : "";
                 Console.ForegroundColor = b.IsSafetyBackup ? ConsoleColor.DarkYellow : ConsoleColor.Gray;
-                Console.WriteLine($"{i + 1,-4} {b.CreatedAt:yyyy-MM-dd HH:mm:ss,-20} {b.FormattedSize,-12} {b.FileCount,-7} {marker}{b.Name}");
+                Console.WriteLine($"{i + 1,-4} {Truncate(b.CampaignName, 21),-22} {b.CreatedAt:yyyy-MM-dd HH:mm:ss,-20} {b.FormattedSize,-10} {b.FileCount,-6} {marker}{b.Name}");
             }
 
             Console.ResetColor();
@@ -215,17 +284,17 @@ namespace RRM_SM
             Console.WriteLine("================");
             Console.ResetColor();
 
-            Console.WriteLine($"{"#",-4} {"Date / Time",-20} {"Size",-12} {"Name"}");
-            Console.WriteLine(new string('-', 70));
+            Console.WriteLine($"{"#",-4} {"Campaign / Faction",-22} {"Date / Time",-20} {"Size",-10} {"Name"}");
+            Console.WriteLine(new string('-', 85));
 
             for (int i = 0; i < backups.Count; i++)
             {
                 var b = backups[i];
                 string marker = b.IsSafetyBackup ? "[SAFETY] " : "";
-                Console.WriteLine($"{i + 1,-4} {b.CreatedAt:yyyy-MM-dd HH:mm:ss,-20} {b.FormattedSize,-12} {marker}{b.Name}");
+                Console.WriteLine($"{i + 1,-4} {Truncate(b.CampaignName, 21),-22} {b.CreatedAt:yyyy-MM-dd HH:mm:ss,-20} {b.FormattedSize,-10} {marker}{b.Name}");
             }
 
-            Console.WriteLine("\nEnter the backup number to restore (or press Enter / 0 to cancel): ");
+            Console.Write("\nEnter the backup number to restore (or press Enter / 0 to cancel): ");
             string? input = Console.ReadLine()?.Trim();
             if (string.IsNullOrWhiteSpace(input) || input == "0" || !int.TryParse(input, out int selection) || selection < 1 || selection > backups.Count)
             {
@@ -237,9 +306,9 @@ namespace RRM_SM
             var chosen = backups[selection - 1];
 
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.Write($"\nWARNING: This will overwrite files in your active save directory with '{chosen.Name}'!");
+            Console.Write($"\nWARNING: This will restore [{chosen.CampaignName}] saves into your game directory from '{chosen.Name}'!");
             Console.ResetColor();
-            Console.Write("\nAre you sure you want to proceed? (yes/no): ");
+            Console.Write("\nA safety backup will be created first. Proceed? (yes/no): ");
 
             string? confirm = Console.ReadLine()?.Trim().ToLowerInvariant();
             if (confirm != "yes" && confirm != "y")
@@ -251,57 +320,46 @@ namespace RRM_SM
 
             try
             {
-                PrintColored("--> Creating safety backup of current active saves...", ConsoleColor.DarkCyan);
+                PrintColored($"--> Restoring {chosen.Name}...", ConsoleColor.Cyan);
                 _backupService.RestoreBackup(chosen, createSafetyBackup: true);
-                PrintColored($"✔ Successfully restored: {chosen.Name}", ConsoleColor.Green);
-                PrintColored("A pre-restore safety snapshot was created in case you need to revert.", ConsoleColor.DarkGreen);
+                PrintColored($"✔ Restored successfully! Active saves updated to: {chosen.Name}", ConsoleColor.Green);
+                PrintColored("✔ Pre-restore safety backup was also saved in the backups directory.", ConsoleColor.DarkGreen);
             }
             catch (Exception ex)
             {
                 PrintColored($"✖ Restore failed: {ex.Message}", ConsoleColor.Red);
             }
-
             WaitForKey();
         }
 
-        private static void OpenFolderInExplorer(string path, string label)
+        private static void OpenFolderInExplorer(string folderPath, string label)
         {
-            if (string.IsNullOrWhiteSpace(path))
+            try
             {
-                PrintColored($"{label} path is not configured.", ConsoleColor.Red);
-                WaitForKey();
-                return;
-            }
-
-            if (!Directory.Exists(path))
-            {
-                try
+                if (string.IsNullOrWhiteSpace(folderPath))
                 {
-                    Directory.CreateDirectory(path);
-                }
-                catch (Exception ex)
-                {
-                    PrintColored($"Could not create {label}: {ex.Message}", ConsoleColor.Red);
+                    PrintColored($"Cannot open {label}: Path is empty.", ConsoleColor.Yellow);
                     WaitForKey();
                     return;
                 }
-            }
 
-            try
-            {
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
+
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = path,
+                    FileName = folderPath,
                     UseShellExecute = true,
                     Verb = "open"
                 });
-                PrintColored($"Opened {label} in File Explorer.", ConsoleColor.Green);
+                PrintColored($"Opened {label} in Windows File Explorer.", ConsoleColor.Green);
             }
             catch (Exception ex)
             {
                 PrintColored($"Failed to open folder: {ex.Message}", ConsoleColor.Red);
             }
-
             WaitForKey();
         }
 
@@ -311,25 +369,26 @@ namespace RRM_SM
             while (inSettings)
             {
                 Console.Clear();
-                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
                 Console.WriteLine("================================================================================");
-                Console.WriteLine("                          SETTINGS & CONFIGURATION                              ");
+                Console.WriteLine("                          CONFIGURATION & SETTINGS                              ");
                 Console.WriteLine("================================================================================");
                 Console.ResetColor();
 
-                Console.WriteLine($"  [1] Game Save Directory : {_config.GameSaveDirectory}");
-                Console.WriteLine($"  [2] Auto-Detect Rome Save Directory");
-                Console.WriteLine($"  [3] Backup Directory    : {_config.BackupDirectory}");
-                Console.WriteLine($"  [4] Compression         : {(_config.CompressBackups ? "Enabled (.zip)" : "Disabled (Folders)")}");
-                Console.WriteLine($"  [5] Retention Limit     : {(_config.MaxBackupsToKeep > 0 ? $"{_config.MaxBackupsToKeep} backups" : "Unlimited")}");
-                Console.WriteLine($"  [6] Open config.json in Editor");
-                Console.WriteLine($"  [0] Return to Main Menu");
-                Console.WriteLine();
+                Console.WriteLine($"  [1] Game Save Directory   : {_config.GameSaveDirectory}");
+                Console.WriteLine($"  [2] Auto-Detect Save Dir  : Scan known locations");
+                Console.WriteLine($"  [3] Backup Directory      : {_config.BackupDirectory}");
+                Console.WriteLine($"  [4] Compression (.zip)    : {(_config.CompressBackups ? "Enabled" : "Disabled")}");
+                Console.WriteLine($"  [5] Max Backups to Keep   : {(_config.MaxBackupsToKeep > 0 ? _config.MaxBackupsToKeep.ToString() : "Unlimited (0)")}");
+                Console.WriteLine($"  [6] Open config.json      : Open file in default editor");
+                Console.WriteLine($"  [0] Back to Main Menu");
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine("--------------------------------------------------------------------------------");
+                Console.ResetColor();
+                Console.Write("\nSelect a setting to edit [0-6]: ");
 
-                Console.Write("Select an option [0-6]: ");
-                string? opt = Console.ReadLine()?.Trim();
-
-                switch (opt)
+                string? choice = Console.ReadLine()?.Trim();
+                switch (choice)
                 {
                     case "1":
                         Console.Write("\nEnter new full path to Game Save Directory: ");
@@ -374,7 +433,7 @@ namespace RRM_SM
                         WaitForKey();
                         break;
                     case "5":
-                        Console.Write("\nEnter maximum user backups to keep (0 for unlimited): ");
+                        Console.Write("\nEnter maximum user backups to keep per campaign (0 for unlimited): ");
                         if (int.TryParse(Console.ReadLine()?.Trim(), out int maxBackups) && maxBackups >= 0)
                         {
                             _config.MaxBackupsToKeep = maxBackups;
@@ -417,11 +476,47 @@ namespace RRM_SM
             {
                 case "--backup":
                 case "-b":
-                    string? customName = args.Length > 1 ? args[1] : null;
+                    string? customName = null;
+                    string? specificCampaign = null;
+
+                    for (int i = 1; i < args.Length; i++)
+                    {
+                        if ((args[i] == "--campaign" || args[i] == "-c") && i + 1 < args.Length)
+                        {
+                            specificCampaign = args[++i];
+                        }
+                        else if (!args[i].StartsWith("-"))
+                        {
+                            customName = args[i];
+                        }
+                    }
+
                     try
                     {
-                        var entry = _backupService.CreateBackup(customName);
-                        Console.WriteLine($"Backup successful: {entry.Name} ({entry.FormattedSize}, {entry.FileCount} files)");
+                        string target = !string.IsNullOrWhiteSpace(specificCampaign)
+                            ? specificCampaign
+                            : _backupService.GetMostRecentCampaign();
+
+                        var entry = _backupService.CreateCampaignBackup(target, customName);
+                        Console.WriteLine($"Backup successful: [{entry.CampaignName}] {entry.Name} ({entry.FormattedSize}, {entry.FileCount} files)");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"Backup error: {ex.Message}");
+                        Environment.ExitCode = 1;
+                    }
+                    break;
+
+                case "--backup-all":
+                    string? allTag = args.Length > 1 && !args[1].StartsWith("-") ? args[1] : null;
+                    try
+                    {
+                        var entries = _backupService.CreateAllCampaignsBackup(allTag);
+                        Console.WriteLine($"Successfully backed up {entries.Count} campaign(s):");
+                        foreach (var e in entries)
+                        {
+                            Console.WriteLine($"  [{e.CampaignName}] -> {e.Name} ({e.FormattedSize})");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -432,11 +527,25 @@ namespace RRM_SM
 
                 case "--list":
                 case "-l":
+                    string? filterCampaign = null;
+                    for (int i = 1; i < args.Length; i++)
+                    {
+                        if ((args[i] == "--campaign" || args[i] == "-c") && i + 1 < args.Length)
+                        {
+                            filterCampaign = args[++i];
+                        }
+                    }
+
                     var backups = _backupService.GetBackups();
+                    if (!string.IsNullOrWhiteSpace(filterCampaign))
+                    {
+                        backups = backups.Where(b => b.CampaignName.Equals(filterCampaign, StringComparison.OrdinalIgnoreCase)).ToList();
+                    }
+
                     Console.WriteLine($"Total Backups: {backups.Count}");
                     foreach (var b in backups)
                     {
-                        Console.WriteLine($"[{b.CreatedAt:yyyy-MM-dd HH:mm:ss}] {b.Name} ({b.FormattedSize})");
+                        Console.WriteLine($"[{b.CreatedAt:yyyy-MM-dd HH:mm:ss}] [{b.CampaignName}] {b.Name} ({b.FormattedSize})");
                     }
                     break;
 
@@ -445,10 +554,11 @@ namespace RRM_SM
                 case "/?":
                     Console.WriteLine("Total War: ROME REMASTERED - Save Manager");
                     Console.WriteLine("Usage:");
-                    Console.WriteLine("  RRM-SM                   Launch interactive menu");
-                    Console.WriteLine("  RRM-SM --backup [name]   Create an immediate backup (optional custom name)");
-                    Console.WriteLine("  RRM-SM --list            List all available snapshots");
-                    Console.WriteLine("  RRM-SM --help            Display this help screen");
+                    Console.WriteLine("  RRM-SM                                  Launch interactive menu");
+                    Console.WriteLine("  RRM-SM --backup [name] [--campaign <c>] Snapshot specified or most recent campaign");
+                    Console.WriteLine("  RRM-SM --backup-all [name]              Snapshot all active campaigns into faction folders");
+                    Console.WriteLine("  RRM-SM --list [--campaign <c>]          List available snapshots (optionally filter by campaign)");
+                    Console.WriteLine("  RRM-SM --help                           Display this help screen");
                     break;
 
                 default:
@@ -456,6 +566,12 @@ namespace RRM_SM
                     Environment.ExitCode = 1;
                     break;
             }
+        }
+
+        private static string Truncate(string value, int maxLen)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            return value.Length <= maxLen ? value : value.Substring(0, maxLen - 1) + "…";
         }
 
         private static void PrintColored(string message, ConsoleColor color)
@@ -474,10 +590,7 @@ namespace RRM_SM
             {
                 Console.ReadKey(true);
             }
-            catch
-            {
-                // In non-interactive or redirected input streams
-            }
+            catch { }
         }
     }
 }
