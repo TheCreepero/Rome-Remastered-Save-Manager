@@ -11,13 +11,15 @@ A friendly, robust save manager and backup utility for **Total War: ROME REMASTE
 - [Prerequisites](#prerequisites)
 - [Quick Start Guide](#quick-start-guide)
 - [Campaign & Faction Recognition](#campaign--faction-recognition)
+  - [Intelligent Multi-Playthrough Separation](#intelligent-multi-playthrough-separation-new)
 - [Using the Desktop Application (GUI)](#using-the-desktop-application-gui)
   - [First Launch & Setup](#first-launch--setup)
   - [Creating Backups](#creating-backups)
   - [Restoring a Past Save](#restoring-a-past-save)
-  - [Filtering & Searching by Faction](#filtering--searching-by-faction)
+  - [Filtering & Searching by Faction & Campaign](#filtering--searching-by-faction--campaign)
+  - [Managing Campaigns: Rename, Merge, and Split (New!)](#managing-campaigns-rename-merge-and-split-new)
   - [Autosave Sentinel & Background Monitoring](#autosave-sentinel--background-monitoring)
-  - [Campaign Chronologer & AAR Generator (New!)](#campaign-chronologer--aar-generator-new)
+  - [Campaign Chronologer & AAR Generator](#campaign-chronologer--aar-generator)
   - [Configuring Settings](#configuring-settings)
 - [Using the Command-Line Interface (CLI)](#using-the-command-line-interface-cli)
   - [Interactive Menu Mode](#interactive-menu-mode)
@@ -34,6 +36,7 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 - **Autosaves get overwritten** every turn. If an unexpected faction betrayal, assassination, or catastrophic battle occurs, your autosave will already be gone.
 - **Accidental overwrites**: Saving over the wrong campaign slot can destroy hours of progress.
 - **Multiple campaigns clash**: Juggling active saves between a Roman campaign, a Greek city-state, and a barbarian faction easily gets cluttered.
+- **Multiple playthroughs with the same faction**: If you played Rome in 2024 and start a new Rome campaign today, standard tools mix all the turns together or delete your old saves when pruning!
 - **Experimenting with risky strategies**: Want to see what happens if you incite the Roman Civil War early or declare war on three empires at once?
 - **Game updates & mods**: Updates or testing mods can occasionally corrupt active saves.
 
@@ -43,13 +46,16 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 
 ## Key Features
 
-- **Flat "Save Vault" Architecture (New!)**: All backup saves are stored as discrete, standalone `.sav` files directly inside your backup folder matching the game's flat save directory structure. No nested snapshot labyrinths! Suffixes are appended to disambiguate repeated quicksaves or replayed turns while preserving original filenames.
+- **Flat "Save Vault" Architecture**: All backup saves are stored as discrete, standalone `.sav` files directly inside your backup folder matching the game's flat save directory structure. No nested snapshot labyrinths! Suffixes are appended to disambiguate repeated quicksaves or replayed turns while preserving original filenames.
+- **Intelligent Multi-Playthrough Separation (New!)**: Separate playthroughs of the same faction (e.g. Byzantium in 2025 at Turn 527 vs Byzantium in 2026 at Turn 183) are automatically detected and kept in separate campaigns using temporal clustering (14-day gap) and turn continuity checks (50 turns).
+- **Campaign Organization Tools (New!)**: Rename campaigns, merge split playthroughs, or split individual saves into a new campaign with a right-click. Custom names are preserved while incoming saves continue to route automatically by faction.
+- **Independent Retention Pools**: Rolling retention limits (manual backups and Sentinel backups) are enforced per campaign playthrough independently. Playing a new campaign will **never** prune older playthroughs of the same faction!
 - **SHA-256 Deduplication**: Identical save files consume zero duplicate disk space.
 - **Rich In-App Organization**: Tag, filter, and organize your saves without filesystem constraints. Mark crucial saves as **Pinned ⭐ Milestones** (which are protected forever against rolling retention limits), write lore notes, assign tags, and filter instantly between Pinned, Sentinel, Manual, and Safety backups.
 - **Campaign Chronologer & AAR Generator**: Turn your gameplay history into an epic saga. Aggregates your save history into a unified chronological timeline, lets you write journal entries, title milestones, add tags, and export publication-ready After Action Reports in styled HTML or Markdown.
 - **Autosave Sentinel (Background Watcher)**: Automatically creates snapshots in real time whenever Rome Remastered writes or updates a save to disk, complete with debouncing, file-lock protection, and single-file differential capture.
 - **System Tray & Desktop Integration**: Minimizes or closes to the Windows notification area, keeps the Autosave Sentinel running quietly while you game, provides balloon notifications, and includes a one-click Steam game launcher (`⚔ Launch Game`).
-- **Self-Healing Index & 1-Click Migration**: If `vault.json` is ever lost, the app reconstructs it by scanning all on-disk `.sav` files with its parser. Automatically discovers and migrates legacy nested backup folders into the flat vault.
+- **Self-Healing Index & 1-Click Migration**: If `vault.json` is ever lost, the app reconstructs it by scanning all on-disk `.sav` files with its parser. Automatically upgrades manifests and migrates legacy nested backup folders into the flat vault.
 - **Safety-First Restore**: Restoring a backup automatically creates a pre-restore safety copy first. You never risk losing your current save by rolling back.
 
 ---
@@ -101,6 +107,19 @@ Total War: ROME REMASTERED generates distinct save file names that encode factio
 
 The Save Manager uses these patterns to group your saves automatically.
 
+### Intelligent Multi-Playthrough Separation (New!)
+
+What if you play multiple separate playthroughs with the same faction over months or years?
+For example, a long 500-turn Byzantium campaign started in 2025, and a fresh Byzantium campaign started in late 2026.
+
+Previously, both playthroughs would be lumped into a single generic "Byzantium" bucket, causing turn numbers to scramble and risk rolling backup pruning deleting saves from your older campaign.
+
+The Save Manager now features **heuristic campaign clustering**:
+- **Temporal Gap Threshold (14 Days)**: If a save for the same faction occurs more than 14 days after the previous save session, it is recognized as a distinct campaign cluster.
+- **Turn Continuity Discontinuity (50 Turns)**: Even if played within days, a dramatic turn jump (e.g. Turn 480 followed by Turn 1) immediately identifies a fresh playthrough.
+- **Automatic Disambiguation**: When multiple campaigns exist for a single faction, the manager automatically gives them clear, timestamped names (e.g. `Byzantium (Feb 2025)` and `Byzantium (Sep 2026)`). If only one campaign exists for a faction, it keeps the clean faction title (e.g. `Kingdom of Macedon`).
+- **Independent Retention Pools**: Backup pruning rules apply to each campaign playthrough independently. Starting a new campaign will **never** cause your beloved completed playthroughs to be deleted!
+
 ---
 
 ## Using the Desktop Application (GUI)
@@ -121,8 +140,8 @@ The Save Manager uses these patterns to group your saves automatically.
 
 Switch to the **Backups Manager** tab:
 
-1. **Active Campaign Selector**: The app inspects your save folder and highlights which faction was played most recently in the **Active Campaign** dropdown.
-2. **Quick Backup**: Snapshots the selected campaign with current timestamp (e.g. `Pergamon/Backup_2026-09-18_19-30-00`).
+1. **Active Campaign Selector**: The app inspects your save folder and highlights which campaign was played most recently in the **Active Campaign** dropdown.
+2. **Quick Backup**: Snapshots the selected campaign with current timestamp.
 3. **Named Backup**: Prompts you for a descriptive tag (e.g. `Siege_Of_Carthage`) and backs up the selected campaign.
 4. **Backup All Campaigns**: One-click button that scans all detected factions and creates individual, organized backups for each active campaign.
 
@@ -139,11 +158,23 @@ Switch to the **Backups Manager** tab:
 
 ---
 
-### Filtering & Searching by Faction
+### Filtering & Searching by Faction & Campaign
 
-- **Filter by Faction**: Use the faction dropdown above the data grid (`[All Campaigns]`, `Kingdom of Macedon`, `Pergamon`, `Rome`, etc.) to view only snapshots for a specific campaign.
-- **Search**: Use the search box to filter backups by custom tag, turn number, or date.
-- **Campaign Column**: The data grid clearly displays the **Campaign / Faction** associated with every backup.
+- **Filter by Campaign**: Use the dropdown above the data grid (`[All Campaigns]`, `Kingdom of Macedon`, `Byzantium (Feb 2025)`, `Byzantium (Sep 2026)`, etc.) to view only snapshots for a specific campaign.
+- **Search**: Use the search box to filter backups by custom tag, turn number, date, or note text.
+- **Campaign Column**: The data grid clearly displays the **Campaign** and underlying **Faction** associated with every backup.
+
+---
+
+### Managing Campaigns: Rename, Merge, and Split (New!)
+
+Right-click any save in the **Backups Manager** list to access campaign management tools:
+
+- **🏷 Rename Campaign...**: Give your campaign a custom roleplay or descriptive name (e.g. `Roman Reclamation` or `Greek Hegemony`).
+  - *Smart Routing*: The manager remembers the underlying faction. Future autosaves from this playthrough continue to be routed smoothly into this campaign!
+- **🔀 Merge Into Another Campaign...**: Selectively merge two separated campaigns into one (for example, if you returned to a campaign after a months-long hiatus and want the saves united).
+- **✂ Split to New Campaign...**: Select one or more saves and split them out into their own dedicated campaign playthrough.
+- **🔄 Rebuild Campaign Assignments**: Available under the **Settings** tab. Re-runs heuristic clustering and auto-disambiguation across your entire save vault at any time.
 
 ---
 
@@ -324,6 +355,12 @@ No problem! The Save Vault includes a **Self-Healing Index**. Click **Rebuild Va
 
 ### 6. Can I migrate my existing nested backup folders?
 Yes! The Save Vault automatically migrates legacy nested folders on startup, or you can click **Migrate Legacy Folders** in the Settings tab. All nested `.sav` files are moved flat into the root vault and indexed into `vault.json`.
+
+### 7. How does Campaign Separation handle new saves?
+When a new save is saved by the game or Sentinel, the manager checks your active campaigns for that faction. If the save is within 14 days and within 50 turns of an active playthrough, it is automatically routed to that campaign. If a long gap or turn reset occurs, it automatically begins a new campaign playthrough.
+
+### 8. Will custom campaign names break future autosaves?
+No! If you rename a campaign to e.g. "Roman Reclamation", the manager continues tracking the underlying faction ("Republic of Rome" or "Rome"). Subsequent saves will continue to route seamlessly into your custom-named campaign.
 
 ---
 

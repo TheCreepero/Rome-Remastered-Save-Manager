@@ -102,7 +102,9 @@ namespace RRM_SM.Services
                     Notes = lastSaved.Notes,
                     Tags = lastSaved.Tags,
                     Source = lastSaved.Source,
-                    CampaignName = lastSaved.CampaignName
+                    CampaignId = lastSaved.CampaignId,
+                    CampaignName = lastSaved.CampaignName,
+                    Faction = lastSaved.Faction
                 };
             }
 
@@ -145,7 +147,9 @@ namespace RRM_SM.Services
                     Notes = lastSaved.Notes,
                     Tags = lastSaved.Tags,
                     Source = lastSaved.Source,
-                    CampaignName = lastSaved.CampaignName
+                    CampaignId = lastSaved.CampaignId,
+                    CampaignName = lastSaved.CampaignName,
+                    Faction = lastSaved.Faction
                 };
             }
 

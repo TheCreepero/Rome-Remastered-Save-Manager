@@ -23,6 +23,7 @@ namespace RRM_SM.UI.Views
             viewModel.InputDialogRequested = ShowInputDialog;
             viewModel.FolderBrowserRequested = ShowFolderBrowser;
             viewModel.EditSaveDialogRequested = ShowEditSaveDialog;
+            viewModel.MergeCampaignDialogRequested = ShowMergeCampaignDialog;
             viewModel.RestoreWindowRequested = RestoreWindow;
             viewModel.ExitApplicationRequested = ExitApplication;
 
@@ -87,6 +88,9 @@ namespace RRM_SM.UI.Views
                 MenuRestore.IsEnabled = hasSelection;
                 MenuOpenExplorer.IsEnabled = vm.SelectedBackup != null;
                 MenuCopyPath.IsEnabled = vm.SelectedBackup != null;
+                MenuRenameCampaign.IsEnabled = hasSelection;
+                MenuMergeCampaign.IsEnabled = hasSelection;
+                MenuSplitCampaign.IsEnabled = hasSelection;
                 MenuDelete.IsEnabled = hasSelection;
             }
         }
@@ -131,6 +135,30 @@ namespace RRM_SM.UI.Views
             }
         }
 
+        private void ContextMenu_RenameCampaign_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.RenameCampaignCommand.CanExecute(null))
+            {
+                vm.RenameCampaignCommand.Execute(null);
+            }
+        }
+
+        private void ContextMenu_MergeCampaign_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.MergeCampaignsCommand.CanExecute(null))
+            {
+                vm.MergeCampaignsCommand.Execute(null);
+            }
+        }
+
+        private void ContextMenu_SplitCampaign_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.SplitCampaignCommand.CanExecute(null))
+            {
+                vm.SplitCampaignCommand.Execute(null);
+            }
+        }
+
         private void ContextMenu_Delete_Click(object sender, RoutedEventArgs e)
         {
             if (DataContext is MainViewModel vm && vm.DeleteBackupCommand.CanExecute(null))
@@ -139,14 +167,23 @@ namespace RRM_SM.UI.Views
             }
         }
 
-        private string? ShowInputDialog(string title, string message)
+        private string? ShowInputDialog(string title, string message, string? defaultText = null)
         {
-            var dialog = new InputDialog(title, message)
+            var dialog = new InputDialog(title, message, defaultText ?? "")
             {
                 Owner = this
             };
             bool? result = dialog.ShowDialog();
             return result == true ? dialog.ResponseText : null;
+        }
+
+        private string? ShowMergeCampaignDialog(string sourceCampaign, IEnumerable<string> availableCampaigns)
+        {
+            var dialog = new MergeCampaignDialog(sourceCampaign, availableCampaigns)
+            {
+                Owner = this
+            };
+            return dialog.ShowDialog() == true ? dialog.SelectedTargetCampaign : null;
         }
 
         private bool ShowEditSaveDialog(RRM_SM.Models.BackupEntry backup)

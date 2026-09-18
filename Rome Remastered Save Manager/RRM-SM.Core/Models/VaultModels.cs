@@ -10,9 +10,21 @@ namespace RRM_SM.Models
         SafetyBackup
     }
 
+    public class CampaignMetadata
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Faction { get; set; } = "General";
+        public string DisplayName { get; set; } = "General";
+        public bool IsCustomNamed { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime LastPlayedAt { get; set; } = DateTime.Now;
+    }
+
     public class VaultSaveItem
     {
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string? CampaignId { get; set; }
+        public string? Faction { get; set; }
         
         /// <summary>
         /// Actual file name residing flat in the backup vault directory (e.g. save_Quicksave_2026-09-19_00-15-00.sav)
@@ -61,9 +73,10 @@ namespace RRM_SM.Models
 
     public class SaveVaultManifest
     {
-        public int Version { get; set; } = 1;
+        public int Version { get; set; } = 2;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
         public List<VaultSaveItem> Saves { get; set; } = new();
+        public Dictionary<string, CampaignMetadata> Campaigns { get; set; } = new();
     }
 }
 

@@ -27,7 +27,9 @@ namespace RRM_SM.Models
         public List<string> Tags { get; set; } = new();
         public string TagsDisplay => Tags != null && Tags.Count > 0 ? string.Join(", ", Tags) : string.Empty;
         public SaveSourceType Source { get; set; } = SaveSourceType.Manual;
+        public string? CampaignId { get; set; }
         public string CampaignName { get; set; } = "General";
+        public string? Faction { get; set; }
 
         public string FormattedSize
         {

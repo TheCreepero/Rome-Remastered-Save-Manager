@@ -247,5 +247,186 @@ namespace RRM_SM.Tests
             var safety = vault.GetAllSaves().FirstOrDefault(s => s.Source == SaveSourceType.SafetyBackup);
             Assert.NotNull(safety);
         }
+
+        [Fact]
+        public void CampaignSeparation_SameFaction_DifferentTimeframes_CreatesTwoCampaigns()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+
+            // Campaign 1: Feb 2025 at Turn 527
+            string save1 = Path.Combine(_gameSaveDir, "save_Autosave   Byzantium   Turn 527 Start.sav");
+            File.WriteAllText(save1, "Byzantium Turn 527 Content");
+            File.SetLastWriteTime(save1, new DateTime(2025, 2, 15, 23, 38, 0));
+            var item1 = vault.AddSaveFile(save1, "Byzantium");
+
+            // Campaign 2: Sep 2026 at Turn 183 (19 months later, turn 183 vs 527)
+            string save2 = Path.Combine(_gameSaveDir, "save_Autosave   Byzantium   Turn 183 Start.sav");
+            File.WriteAllText(save2, "Byzantium Turn 183 Content");
+            File.SetLastWriteTime(save2, new DateTime(2026, 9, 18, 23, 0, 0));
+            var item2 = vault.AddSaveFile(save2, "Byzantium");
+
+            // Verify they have distinct CampaignIds
+            Assert.NotNull(item1.CampaignId);
+            Assert.NotNull(item2.CampaignId);
+            Assert.NotEqual(item1.CampaignId, item2.CampaignId);
+
+            // Verify automatic naming disambiguation with date
+            Assert.Contains("2025", item1.CampaignName);
+            Assert.Contains("2026", item2.CampaignName);
+            Assert.Equal("Byzantium", item1.Faction);
+            Assert.Equal("Byzantium", item2.Faction);
+        }
+
+        [Fact]
+        public void CampaignSeparation_SameFaction_ConsecutiveSessions_SharesCampaignId()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+
+            // Session 1: Turn 182
+            string save1 = Path.Combine(_gameSaveDir, "save_Autosave   Byzantium   Turn 182 End.sav");
+            File.WriteAllText(save1, "Byzantium Turn 182");
+            File.SetLastWriteTime(save1, new DateTime(2026, 9, 17, 22, 0, 0));
+            var item1 = vault.AddSaveFile(save1, "Byzantium");
+
+            // Session 2: Turn 183 (1 day later)
+            string save2 = Path.Combine(_gameSaveDir, "save_Autosave   Byzantium   Turn 183 Start.sav");
+            File.WriteAllText(save2, "Byzantium Turn 183");
+            File.SetLastWriteTime(save2, new DateTime(2026, 9, 18, 22, 0, 0));
+            var item2 = vault.AddSaveFile(save2, "Byzantium");
+
+            // Same campaign playthrough!
+            Assert.Equal(item1.CampaignId, item2.CampaignId);
+            Assert.Equal(item1.CampaignName, item2.CampaignName);
+        }
+
+        [Fact]
+        public void CampaignSeparation_SameFaction_TurnDiscontinuity_CreatesNewCampaign()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+
+            // High turn save
+            string save1 = Path.Combine(_gameSaveDir, "save_Autosave   Rome   Turn 480 Start.sav");
+            File.WriteAllText(save1, "Rome Turn 480");
+            File.SetLastWriteTime(save1, new DateTime(2026, 9, 10, 12, 0, 0));
+            var item1 = vault.AddSaveFile(save1, "Rome");
+
+            // Turn 1 save (479 turns apart, despite only 2 days difference)
+            string save2 = Path.Combine(_gameSaveDir, "save_Autosave   Rome   Turn 1 Start.sav");
+            File.WriteAllText(save2, "Rome Turn 1");
+            File.SetLastWriteTime(save2, new DateTime(2026, 9, 12, 12, 0, 0));
+            var item2 = vault.AddSaveFile(save2, "Rome");
+
+            Assert.NotEqual(item1.CampaignId, item2.CampaignId);
+        }
+
+        [Fact]
+        public void CampaignSeparation_EnforceRetentionLimit_PrunesByCampaignIdIndependently()
+        {
+            _config.MaxBackupsToKeep = 2; // Only keep 2 manual saves per campaign
+            var vault = new SaveVaultService(_config, _parser);
+
+            // Campaign 1: 3 saves
+            for (int i = 1; i <= 3; i++)
+            {
+                string path = Path.Combine(_gameSaveDir, $"save_Autosave   Byzantium   Turn {520 + i}.sav");
+                File.WriteAllText(path, $"Camp 1 Turn {520 + i}");
+                File.SetLastWriteTime(path, new DateTime(2025, 2, 10 + i, 12, 0, 0));
+                vault.AddSaveFile(path, "Byzantium");
+            }
+
+            // Campaign 2: 1 save (18 months later)
+            string camp2Path = Path.Combine(_gameSaveDir, "save_Autosave   Byzantium   Turn 1.sav");
+            File.WriteAllText(camp2Path, "Camp 2 Turn 1");
+            File.SetLastWriteTime(camp2Path, new DateTime(2026, 9, 18, 12, 0, 0));
+            var camp2Item = vault.AddSaveFile(camp2Path, "Byzantium");
+
+            var allSaves = vault.GetAllSaves();
+            // Campaign 1 should have 2 saves left (pruned from 3 to 2)
+            var camp1Saves = allSaves.Where(s => s.CampaignId != camp2Item.CampaignId).ToList();
+            Assert.Equal(2, camp1Saves.Count);
+
+            // Campaign 2 should still have its 1 save (not pruned because of campaign 1)
+            var camp2Saves = allSaves.Where(s => s.CampaignId == camp2Item.CampaignId).ToList();
+            Assert.Single(camp2Saves);
+        }
+
+        [Fact]
+        public void CampaignSeparation_MergeAndSplitCampaigns()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+
+            string path1 = Path.Combine(_gameSaveDir, "save_Autosave   Macedon   Turn 10.sav");
+            File.WriteAllText(path1, "Macedon Turn 10");
+            File.SetLastWriteTime(path1, new DateTime(2026, 1, 1));
+            var item1 = vault.AddSaveFile(path1, "Macedon");
+
+            string path2 = Path.Combine(_gameSaveDir, "save_Autosave   Macedon   Turn 50.sav");
+            File.WriteAllText(path2, "Macedon Turn 50");
+            File.SetLastWriteTime(path2, new DateTime(2026, 6, 1)); // 5 months later -> separate campaign
+            var item2 = vault.AddSaveFile(path2, "Macedon");
+
+            Assert.NotEqual(item1.CampaignId, item2.CampaignId);
+
+            // Merge Campaign 2 into Campaign 1
+            vault.MergeCampaigns(item1.CampaignId!, new[] { item2.CampaignId! });
+            var mergedSaves = vault.GetAllSaves();
+            Assert.Equal(item1.CampaignId, mergedSaves.First(s => s.Id == item2.Id).CampaignId);
+
+            // Split item2 into a new campaign
+            var splitMeta = vault.SplitCampaign(new[] { item2.Id }, "Macedon Late Game");
+            Assert.Equal("Macedon Late Game", splitMeta.DisplayName);
+
+            var afterSplit = vault.GetAllSaves();
+            Assert.Equal(splitMeta.Id, afterSplit.First(s => s.Id == item2.Id).CampaignId);
+            Assert.Equal("Macedon Late Game", afterSplit.First(s => s.Id == item2.Id).CampaignName);
+        }
+
+        [Fact]
+        public void CampaignSeparation_RenameCampaign_PreservesFactionAndMatchesNewSaves()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+
+            string path1 = Path.Combine(_gameSaveDir, "save_Autosave   Byzantium   Turn 180.sav");
+            File.WriteAllText(path1, "Turn 180");
+            File.SetLastWriteTime(path1, new DateTime(2026, 9, 18, 10, 0, 0));
+            var item1 = vault.AddSaveFile(path1, "Byzantium");
+
+            // Rename to custom name
+            vault.RenameCampaign(item1.CampaignId!, "Roman Reclamation");
+
+            var updatedItem = vault.GetSaveById(item1.Id);
+            Assert.Equal("Roman Reclamation", updatedItem!.CampaignName);
+
+            // Add a new save for the same faction within 14 days and 50 turns
+            string path2 = Path.Combine(_gameSaveDir, "save_Autosave   Byzantium   Turn 181.sav");
+            File.WriteAllText(path2, "Turn 181");
+            File.SetLastWriteTime(path2, new DateTime(2026, 9, 18, 12, 0, 0));
+            var item2 = vault.AddSaveFile(path2, "Byzantium");
+
+            // It should be assigned to the renamed campaign!
+            Assert.Equal(item1.CampaignId, item2.CampaignId);
+            Assert.Equal("Roman Reclamation", item2.CampaignName);
+        }
+
+        [Fact]
+        public void CampaignSeparation_RebuildCampaignAssignments_FixesLegacyFolderNames()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+
+            // Add a save with legacy folder name as campaign name
+            string saveFile = Path.Combine(_gameSaveDir, "save_Autosave   Achaean League   Turn 3 End.sav");
+            File.WriteAllText(saveFile, "Achaean League Turn 3");
+            File.SetLastWriteTime(saveFile, new DateTime(2024, 8, 29, 17, 30, 0));
+            var item = vault.AddSaveFile(saveFile, "Backup_2026-09-18_19-33-14");
+
+            // Rebuild
+            vault.RebuildCampaignAssignments();
+
+            var reloaded = vault.GetSaveById(item.Id);
+            Assert.NotNull(reloaded);
+            Assert.Equal("Achaean League", reloaded.Faction);
+            Assert.Equal("Achaean League", reloaded.CampaignName);
+            Assert.Equal(3, reloaded.Turn);
+        }
     }
 }

@@ -562,6 +562,10 @@
                                             <MenuItem x:Name="MenuOpenExplorer" Header="📂 Reveal in File Explorer" Click="ContextMenu_OpenExplorer_Click" Foreground="#FFFFFF"/>
                                             <MenuItem x:Name="MenuCopyPath" Header="📋 Copy Full Path" Click="ContextMenu_CopyPath_Click" Foreground="#FFFFFF"/>
                                             <Separator Background="{StaticResource BorderBrush}"/>
+                                            <MenuItem x:Name="MenuRenameCampaign" Header="🏷 Rename Campaign..." Click="ContextMenu_RenameCampaign_Click" Foreground="#FFFFFF"/>
+                                            <MenuItem x:Name="MenuMergeCampaign" Header="🔀 Merge Into Another Campaign..." Click="ContextMenu_MergeCampaign_Click" Foreground="#FFFFFF"/>
+                                            <MenuItem x:Name="MenuSplitCampaign" Header="✂ Split to New Campaign..." Click="ContextMenu_SplitCampaign_Click" Foreground="#FFFFFF"/>
+                                            <Separator Background="{StaticResource BorderBrush}"/>
                                             <MenuItem x:Name="MenuDelete" Header="🗑 Delete Save..." Click="ContextMenu_Delete_Click" Foreground="{StaticResource AccentRed}"/>
                                         </ContextMenu>
                                     </DataGrid.ContextMenu>
@@ -934,6 +938,8 @@
                                             ToolTip="Scans all .sav files directly in the backup directory and reconstructs the vault.json manifest"/>
                                     <Button Content="📦 Migrate Legacy Folders" Command="{Binding MigrateLegacyBackupsCommand}" Style="{StaticResource ActionButton}" Margin="0,0,8,4"
                                             ToolTip="Scans for old nested backup subdirectories and imports all saves into the flat vault structure"/>
+                                    <Button Content="🔄 Rebuild Campaign Assignments" Command="{Binding RebuildCampaignAssignmentsCommand}" Style="{StaticResource ActionButton}" Margin="0,0,8,4"
+                                            ToolTip="Re-evaluates and clusters all vault saves by play date (14-day gap) and turn continuity (50 turns) to separate playthroughs"/>
                                     <Button Content="🧹 Clean Unpinned Sentinel Saves" Command="{Binding CleanUnpinnedSentinelCommand}" Style="{StaticResource DangerButton}" Margin="0,0,8,4"
                                             ToolTip="Removes all unpinned Sentinel snapshots to immediately reclaim storage space while preserving all pinned milestones"/>
                                 </WrapPanel>

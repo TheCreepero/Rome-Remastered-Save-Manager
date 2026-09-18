@@ -13,15 +13,23 @@ namespace RRM_SM.Services
     {
         private readonly AppConfig _config;
         private readonly CampaignParserService _parserService;
+        private readonly SaveVaultService? _vaultService;
 
-        public ChronicleService(AppConfig config, CampaignParserService parserService)
+        public ChronicleService(AppConfig config, CampaignParserService parserService, SaveVaultService? vaultService = null)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _parserService = parserService ?? throw new ArgumentNullException(nameof(parserService));
+            _vaultService = vaultService;
         }
 
-        private string GetChronicleFilePath(string campaignName)
+        private string GetChronicleFilePath(string campaignName, string? campaignId = null)
         {
+            if (!string.IsNullOrWhiteSpace(campaignId))
+            {
+                string idPath = Path.Combine(_config.BackupDirectory, $"chronicle_{campaignId}.json");
+                if (File.Exists(idPath)) return idPath;
+            }
+
             string cleanCampaign = CampaignParserService.CleanFactionName(campaignName);
             string flatPath = Path.Combine(_config.BackupDirectory, $"chronicle_{cleanCampaign}.json");
             if (File.Exists(flatPath)) return flatPath;
@@ -29,14 +37,17 @@ namespace RRM_SM.Services
             string legacyPath = Path.Combine(_config.BackupDirectory, cleanCampaign, "chronicle.json");
             if (File.Exists(legacyPath)) return legacyPath;
 
-            return flatPath;
+            return !string.IsNullOrWhiteSpace(campaignId)
+                ? Path.Combine(_config.BackupDirectory, $"chronicle_{campaignId}.json")
+                : flatPath;
         }
 
-        public CampaignChronicle BuildChronicle(string campaignName)
+        public CampaignChronicle BuildChronicle(string campaignName, string? campaignId = null)
         {
-            var chronicleFile = GetChronicleFilePath(campaignName);
+            var chronicleFile = GetChronicleFilePath(campaignName, campaignId);
             var chronicle = new CampaignChronicle
             {
+                CampaignId = campaignId,
                 CampaignName = campaignName,
                 ModName = "Rome Remastered" // Default, could be customized
             };
@@ -50,8 +61,8 @@ namespace RRM_SM.Services
                     var existingChronicle = JsonSerializer.Deserialize<CampaignChronicle>(json);
                     if (existingChronicle != null)
                     {
-                        chronicle.CampaignSummary = existingChronicle.CampaignSummary;
-                        chronicle.ModName = existingChronicle.ModName;
+                        chronicle.CampaignSummary = existingChronicle.CampaignSummary ?? "";
+                        chronicle.ModName = !string.IsNullOrWhiteSpace(existingChronicle.ModName) ? existingChronicle.ModName : "Rome Remastered";
                         chronicle.Milestones = existingChronicle.Milestones ?? new List<ChronicleMilestone>();
                     }
                 }
@@ -61,29 +72,79 @@ namespace RRM_SM.Services
                 }
             }
 
-            // Gather all saves for this campaign
-            var allFiles = new List<string>();
-            
+            var saveInfos = new List<CampaignSaveInfo>();
+
+            // 1. If vault service is available, query vault saves for this campaign ID or name
+            if (_vaultService != null)
+            {
+                var vaultSaves = _vaultService.GetCampaignSaves(campaignName, campaignId);
+                foreach (var vs in vaultSaves)
+                {
+                    saveInfos.Add(new CampaignSaveInfo
+                    {
+                        FilePath = Path.Combine(_config.BackupDirectory, vs.StoredFileName),
+                        FileName = vs.OriginalGameFileName,
+                        FactionName = vs.Faction ?? vs.CampaignName,
+                        Turn = vs.Turn,
+                        Type = vs.SaveType,
+                        LastModified = vs.LastModified,
+                        FileSizeBytes = vs.FileSizeBytes
+                    });
+                }
+            }
+            else
+            {
+                // Fallback: gather all backup files and parse
+                string backupFolder = _config.BackupDirectory;
+                if (Directory.Exists(backupFolder))
+                {
+                    var backupFiles = Directory.GetFiles(backupFolder, "*.sav", SearchOption.AllDirectories);
+                    var grouped = _parserService.GroupSaveFiles(backupFiles);
+                    if (grouped.TryGetValue(campaignName, out var bSaves))
+                    {
+                        saveInfos.AddRange(bSaves);
+                    }
+                }
+            }
+
+            // 2. Active game saves: add saves that belong to this campaign
             string activeFolder = _config.GameSaveDirectory;
             if (Directory.Exists(activeFolder))
             {
-                allFiles.AddRange(Directory.GetFiles(activeFolder, "*.sav"));
-            }
+                var activeFiles = Directory.GetFiles(activeFolder, "*.sav");
+                var grouped = _parserService.GroupSaveFiles(activeFiles);
+                string faction = campaignName;
+                if (_vaultService != null)
+                {
+                    var meta = _vaultService.GetCampaignMetadata(campaignId ?? campaignName);
+                    if (meta != null && !string.IsNullOrWhiteSpace(meta.Faction))
+                    {
+                        faction = meta.Faction;
+                    }
+                }
 
-            string backupFolder = _config.BackupDirectory;
-            if (Directory.Exists(backupFolder))
-            {
-                allFiles.AddRange(Directory.GetFiles(backupFolder, "*.sav", SearchOption.AllDirectories));
-            }
-
-            var groupedSaves = _parserService.GroupSaveFiles(allFiles);
-            if (!groupedSaves.TryGetValue(campaignName, out var saves))
-            {
-                saves = new List<CampaignSaveInfo>();
+                if (grouped.TryGetValue(faction, out var aSaves))
+                {
+                    foreach (var aSave in aSaves)
+                    {
+                        if (saveInfos.Count == 0)
+                        {
+                            saveInfos.Add(aSave);
+                        }
+                        else
+                        {
+                            double minDays = saveInfos.Min(s => Math.Abs((aSave.LastModified - s.LastModified).TotalDays));
+                            if (minDays <= 14.0)
+                            {
+                                saveInfos.Add(aSave);
+                            }
+                        }
+                    }
+                }
             }
 
             // Deduplicate by file name, taking the one with the latest modified date just in case
-            var uniqueSaves = saves
+            var uniqueSaves = saveInfos
                 .GroupBy(s => s.FileName.ToLowerInvariant())
                 .Select(g => g.OrderByDescending(s => s.LastModified).First())
                 .OrderBy(s => s.LastModified)
@@ -133,7 +194,7 @@ namespace RRM_SM.Services
 
         public void SaveChronicleNotes(CampaignChronicle chronicle)
         {
-            var chronicleFile = GetChronicleFilePath(chronicle.CampaignName);
+            var chronicleFile = GetChronicleFilePath(chronicle.CampaignName, chronicle.CampaignId);
             var options = new JsonSerializerOptions { WriteIndented = true };
             string json = JsonSerializer.Serialize(chronicle, options);
             File.WriteAllText(chronicleFile, json);

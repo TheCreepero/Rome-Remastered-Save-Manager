@@ -72,8 +72,8 @@ namespace RRM_SM.Services
                     saveInfo.Type = SaveFileType.Battle;
                 }
 
-                // If details contains a number (e.g. Turn 101 or 101 or Turn 101 Battle)
-                var turnMatch = Regex.Match(details, @"^(?:turn\s*)?(?<turn>\d+)(?:\s+.*)?$", RegexOptions.IgnoreCase);
+                // If details contains a number (e.g. Turn 101 or 101 or Turn 101 Battle or 101_2026-...)
+                var turnMatch = Regex.Match(details, @"^(?:turn\s*)?(?<turn>\d+)(?:[\s_-].*)?$", RegexOptions.IgnoreCase);
                 if (turnMatch.Success && int.TryParse(turnMatch.Groups["turn"].Value, out int turn))
                 {
                     saveInfo.Turn = turn;

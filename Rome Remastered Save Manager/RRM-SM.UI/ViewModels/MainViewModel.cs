@@ -88,7 +88,7 @@ namespace RRM_SM.UI.ViewModels
             _config = _configService.LoadOrCreateConfig();
             _backupService = new BackupService(_config);
             _parserService = new CampaignParserService();
-            _chronicleService = new ChronicleService(_config, _parserService);
+            _chronicleService = new ChronicleService(_config, _parserService, _backupService.VaultService);
 
             // Initialize from config
             _gameSaveDirectory = _config.GameSaveDirectory;
@@ -169,6 +169,10 @@ namespace RRM_SM.UI.ViewModels
             RebuildIndexCommand = new RelayCommand(ExecuteRebuildIndex, () => !IsBusy);
             MigrateLegacyBackupsCommand = new RelayCommand(ExecuteMigrateLegacyBackups, () => !IsBusy);
             CleanUnpinnedSentinelCommand = new RelayCommand(ExecuteCleanUnpinnedSentinel, () => !IsBusy);
+            RebuildCampaignAssignmentsCommand = new RelayCommand(async () => await RebuildCampaignAssignmentsAsync(), () => !IsBusy);
+            RenameCampaignCommand = new RelayCommand(ExecuteRenameCampaign, () => SelectedBackup != null && !IsBusy);
+            MergeCampaignsCommand = new RelayCommand(ExecuteMergeCampaigns, () => SelectedBackup != null && !IsBusy);
+            SplitCampaignCommand = new RelayCommand(ExecuteSplitCampaign, () => SelectedBackup != null && !IsBusy);
 
             // Initial load
             RefreshPathStatuses();
@@ -477,6 +481,10 @@ namespace RRM_SM.UI.ViewModels
         public ICommand RebuildIndexCommand { get; }
         public ICommand MigrateLegacyBackupsCommand { get; }
         public ICommand CleanUnpinnedSentinelCommand { get; }
+        public ICommand RebuildCampaignAssignmentsCommand { get; }
+        public ICommand RenameCampaignCommand { get; }
+        public ICommand MergeCampaignsCommand { get; }
+        public ICommand SplitCampaignCommand { get; }
 
         // ───────────────────── Backup Operations ─────────────────────
 
@@ -737,9 +745,9 @@ namespace RRM_SM.UI.ViewModels
             }
         }
 
-        public void UpdateSaveMetadata(string vaultId, string? title, string? notes, IEnumerable<string>? tags, bool isPinned)
+        public void UpdateSaveMetadata(string vaultId, string? title, string? notes, IEnumerable<string>? tags, bool isPinned, string? campaignId = null)
         {
-            _backupService.VaultService.UpdateMetadata(vaultId, title, notes, tags, isPinned);
+            _backupService.VaultService.UpdateMetadata(vaultId, title, notes, tags, isPinned, campaignId);
         }
 
         private async void ExecuteRebuildIndex()
@@ -858,6 +866,110 @@ namespace RRM_SM.UI.ViewModels
             finally
             {
                 IsBusy = false;
+            }
+        }
+
+        // ───────────────────── Campaign Management Operations ─────────────────────
+
+        public async Task RebuildCampaignAssignmentsAsync()
+        {
+            IsBusy = true;
+            StatusMessage = "Rebuilding campaign assignments and clustering playthroughs...";
+            try
+            {
+                await Task.Run(() => _backupService.VaultService.RebuildCampaignAssignments());
+                ExecuteRefreshBackups();
+                StatusMessage = "✔ Campaign assignments rebuilt successfully.";
+                MessageBox.Show("Campaign assignments have been rebuilt.\n\nSaves from the same faction have been separated into distinct campaigns based on play date (14-day gap) and turn continuity (50 turns).", "Campaigns Rebuilt", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"✖ Campaign rebuild failed: {ex.Message}";
+                MessageBox.Show($"Failed to rebuild campaign assignments:\n{ex.Message}", "Rebuild Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+
+        private void ExecuteRenameCampaign()
+        {
+            if (SelectedBackup == null) return;
+            string currentName = SelectedBackup.CampaignName;
+            string? newName = InputDialogRequested?.Invoke("Rename Campaign", "Enter a new name for this campaign:", currentName);
+            if (!string.IsNullOrWhiteSpace(newName) && !newName.Equals(currentName, StringComparison.OrdinalIgnoreCase))
+            {
+                RenameCampaign(SelectedBackup.CampaignId ?? currentName, newName);
+            }
+        }
+
+        private void ExecuteMergeCampaigns()
+        {
+            if (SelectedBackup == null) return;
+            string sourceCampaign = SelectedBackup.CampaignName;
+            var available = AvailableCampaignFilters;
+
+            string? target = MergeCampaignDialogRequested?.Invoke(sourceCampaign, available);
+            if (!string.IsNullOrWhiteSpace(target))
+            {
+                MergeCampaigns(target, new[] { SelectedBackup.CampaignId ?? sourceCampaign });
+            }
+        }
+
+        private void ExecuteSplitCampaign()
+        {
+            if (SelectedBackup == null) return;
+            string currentName = SelectedBackup.CampaignName;
+            string? newName = InputDialogRequested?.Invoke("Split Campaign", "Enter a name for the new split campaign (or leave blank to auto-name):", $"{currentName} (Split)");
+            if (newName != null) // User did not press cancel
+            {
+                SplitCampaign(new[] { SelectedBackup.VaultId! }, string.IsNullOrWhiteSpace(newName) ? null : newName);
+            }
+        }
+
+        public void RenameCampaign(string campaignIdOrName, string newName)
+        {
+            try
+            {
+                _backupService.VaultService.RenameCampaign(campaignIdOrName, newName);
+                ExecuteRefreshBackups();
+                StatusMessage = $"✔ Renamed campaign to '{newName}'.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"✖ Rename failed: {ex.Message}";
+                MessageBox.Show($"Failed to rename campaign:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        public void MergeCampaigns(string targetCampaignIdOrName, IEnumerable<string> sourceCampaignIdsOrNames)
+        {
+            try
+            {
+                _backupService.VaultService.MergeCampaigns(targetCampaignIdOrName, sourceCampaignIdsOrNames);
+                ExecuteRefreshBackups();
+                StatusMessage = $"✔ Successfully merged into '{targetCampaignIdOrName}'.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"✖ Merge failed: {ex.Message}";
+                MessageBox.Show($"Failed to merge campaigns:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        public void SplitCampaign(IEnumerable<string> saveIds, string? newCampaignName = null)
+        {
+            try
+            {
+                var newMeta = _backupService.VaultService.SplitCampaign(saveIds, newCampaignName);
+                ExecuteRefreshBackups();
+                StatusMessage = $"✔ Split save into new campaign '{newMeta.DisplayName}'.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"✖ Split failed: {ex.Message}";
+                MessageBox.Show($"Failed to split campaign:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1013,7 +1125,8 @@ namespace RRM_SM.UI.ViewModels
 
             try
             {
-                _currentChronicle = _chronicleService.BuildChronicle(SelectedChronicleCampaign);
+                var campMeta = _backupService.VaultService.GetCampaignMetadata(SelectedChronicleCampaign);
+                _currentChronicle = _chronicleService.BuildChronicle(SelectedChronicleCampaign, campMeta?.Id);
                 ChronicleMilestones = new ObservableCollection<ChronicleMilestone>(_currentChronicle.Milestones);
                 
                 int totalTurns = _currentChronicle.MaxTurn;
@@ -1199,12 +1312,14 @@ namespace RRM_SM.UI.ViewModels
             return $"{bytes} B";
         }
 
-        public Func<string, string, string?>? InputDialogRequested { get; set; }
+        public Func<string, string, string?, string?>? InputDialogRequested { get; set; }
 
-        private string? PromptForInput(string title, string message)
+        private string? PromptForInput(string title, string message, string? defaultText = null)
         {
-            return InputDialogRequested?.Invoke(title, message);
+            return InputDialogRequested?.Invoke(title, message, defaultText);
         }
+
+        public Func<string, IEnumerable<string>, string?>? MergeCampaignDialogRequested { get; set; }
 
         public Func<string, string, string?>? FolderBrowserRequested { get; set; }
 
