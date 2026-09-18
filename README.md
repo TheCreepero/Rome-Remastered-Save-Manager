@@ -41,16 +41,16 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 
 ## Key Features
 
-- 🏛 **Automatic Campaign & Faction Recognition**: Automatically identifies the faction or campaign name directly from savefile names (supporting Rome Remastered autosaves, manual hyphenated saves, direct faction names, and smart quicksave association).
-- 📂 **Faction-Sorted Backup Folders**: Backups are organized on disk into dedicated faction subfolders (e.g. `Rome Remastered Backups/Kingdom of Macedon/Backup_...`).
-- 🧹 **Per-Campaign Retention**: When retention limits are enabled, snapshots are managed on a per-campaign basis — starting a new campaign will **not** purge backups of your older campaigns!
-- ⚡ **Instant Active Campaign Backup**: One-click button to snapshot the campaign you are currently playing.
-- 📦 **Backup All Campaigns**: Back up every active campaign detected in your save folder in a single click.
-- 🔍 **Automatic Detection**: Discovers your Rome Remastered save directory out-of-the-box (supports standard Feral Interactive folders and Steam userdata paths).
-- 🏷 **Custom Named Checkpoints**: Label your backups (e.g. `Julii_Turn30_Invading_Gaul`, `Brutii_Before_Senate_Demands`).
-- 🛡 **Safety-First Restore**: Restoring a backup automatically creates a pre-restore safety copy first. You never risk losing your current save by rolling back.
-- 🗜 **Optional ZIP Compression**: Save disk space by storing snapshots as `.zip` archives or keep them as plain folders.
-- 💻 **CLI & Scripting Ready**: Run unattended backups via commands or automate them before launching the game.
+- **Automatic Campaign & Faction Recognition**: Automatically identifies the faction or campaign name directly from savefile names (supporting Rome Remastered autosaves, manual hyphenated saves, direct faction names, and smart quicksave association).
+- **Faction-Sorted Backup Folders**: Backups are organized on disk into dedicated faction subfolders (e.g. `Rome Remastered Backups/Kingdom of Macedon/Backup_...`).
+- **Per-Campaign Retention**: When retention limits are enabled, snapshots are managed on a per-campaign basis — starting a new campaign will **not** purge backups of your older campaigns!
+- **Instant Active Campaign Backup**: One-click button to snapshot the campaign you are currently playing.
+- **Backup All Campaigns**: Back up every active campaign detected in your save folder in a single click.
+- **Automatic Detection**: Discovers your Rome Remastered save directory out-of-the-box (supports standard Feral Interactive folders and Steam userdata paths).
+- **Custom Named Checkpoints**: Label your backups (e.g. `Julii_Turn30_Invading_Gaul`, `Brutii_Before_Senate_Demands`).
+- **Safety-First Restore**: Restoring a backup automatically creates a pre-restore safety copy first. You never risk losing your current save by rolling back.
+- **Optional ZIP Compression**: Save disk space by storing snapshots as `.zip` archives or keep them as plain folders.
+- **CLI & Scripting Ready**: Run unattended backups via commands or automate them before launching the game.
 
 ---
 
@@ -108,30 +108,30 @@ The Save Manager uses these patterns to group your saves automatically.
 ### First Launch & Setup
 
 1. Launch `RRM-SM.UI.exe`.
-2. Click the **⚙ Settings** tab.
+2. Click the **Settings** tab.
 3. Look at the **Game Save Directory** indicator:
-   - 🟢 **Directory found ✔**: The application automatically detected where your game stores saves!
-   - 🔴 **Directory NOT found**: Click **Auto-Detect** to scan again. If you installed the game in a custom location, click **Browse...** and select your game's `saves` folder.
+   - **Directory found**: The application automatically detected where your game stores saves!
+   - **Directory NOT found**: Click **Auto-Detect** to scan again. If you installed the game in a custom location, click **Browse...** and select your game's `saves` folder.
 4. Verify your **Backup Storage Directory** (defaults to `Documents\Rome Remastered Backups`).
-5. Click **💾 Save Settings**.
+5. Click **Save Settings**.
 
 ---
 
 ### Creating Backups
 
-Switch to the **⚔ Backups Manager** tab:
+Switch to the **Backups Manager** tab:
 
 1. **Active Campaign Selector**: The app inspects your save folder and highlights which faction was played most recently in the **Active Campaign** dropdown.
-2. **⚡ Quick Backup**: Snapshots the selected campaign with current timestamp (e.g. `Pergamon/Backup_2026-09-18_19-30-00`).
-3. **🏷 Named Backup**: Prompts you for a descriptive tag (e.g. `Siege_Of_Carthage`) and backs up the selected campaign.
-4. **📦 Backup All Campaigns**: One-click button that scans all detected factions and creates individual, organized backups for each active campaign.
+2. **Quick Backup**: Snapshots the selected campaign with current timestamp (e.g. `Pergamon/Backup_2026-09-18_19-30-00`).
+3. **Named Backup**: Prompts you for a descriptive tag (e.g. `Siege_Of_Carthage`) and backs up the selected campaign.
+4. **Backup All Campaigns**: One-click button that scans all detected factions and creates individual, organized backups for each active campaign.
 
 ---
 
 ### Restoring a Past Save
 
-1. In the **⚔ Backups Manager** list, click on the backup you want to return to.
-2. Click **↩ Restore Selected**.
+1. In the **Backups Manager** list, click on the backup you want to return to.
+2. Click **Restore Selected**.
 3. A confirmation dialog will appear:
    - The app will ask if you would like to create a **Safety Backup** of your currently active saves before proceeding.
    - Click **Yes** (recommended). The app saves your current campaign state as `SafetyBackup_PreRestore_[Timestamp]` and restores the chosen snapshot into the game's folder.
@@ -142,14 +142,14 @@ Switch to the **⚔ Backups Manager** tab:
 ### Filtering & Searching by Faction
 
 - **Filter by Faction**: Use the faction dropdown above the data grid (`[All Campaigns]`, `Kingdom of Macedon`, `Pergamon`, `Rome`, etc.) to view only snapshots for a specific campaign.
-- **Search**: Use the search box (`🔍`) to filter backups by custom tag, turn number, or date.
+- **Search**: Use the search box to filter backups by custom tag, turn number, or date.
 - **Campaign Column**: The data grid clearly displays the **Campaign / Faction** associated with every backup.
 
 ---
 
 ### Configuring Settings
 
-Under the **⚙ Settings** tab, you can customize:
+Under the **Settings** tab, you can customize:
 
 | Setting | Description | Default |
 | :--- | :--- | :--- |
