@@ -22,3 +22,4 @@ namespace RRM_SM.Models
         public long FileSizeBytes { get; set; }
     }
 }
+
