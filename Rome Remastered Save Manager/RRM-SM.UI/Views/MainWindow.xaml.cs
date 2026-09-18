@@ -47,6 +47,15 @@ namespace RRM_SM.UI.Views
             }
         }
 
+        private void DataGridRow_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.RestoreCommand.CanExecute(null))
+            {
+                vm.RestoreCommand.Execute(null);
+                e.Handled = true;
+            }
+        }
+
         private string? ShowInputDialog(string title, string message)
         {
             var dialog = new InputDialog(title, message)

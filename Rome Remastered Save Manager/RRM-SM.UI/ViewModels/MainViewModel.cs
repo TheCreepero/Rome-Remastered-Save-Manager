@@ -62,6 +62,7 @@ namespace RRM_SM.UI.ViewModels
             DeleteBackupCommand = new RelayCommand(ExecuteDeleteBackup, () => !IsBusy && SelectedBackup != null);
             RefreshBackupsCommand = new RelayCommand(ExecuteRefreshBackups, () => !IsBusy);
             OpenSelectedInExplorerCommand = new RelayCommand(ExecuteOpenSelectedInExplorer, () => SelectedBackup != null);
+            CopyBackupPathCommand = new RelayCommand(ExecuteCopyBackupPath, () => SelectedBackup != null);
 
             BrowseSaveDirCommand = new RelayCommand(ExecuteBrowseSaveDir);
             BrowseBackupDirCommand = new RelayCommand(ExecuteBrowseBackupDir);
@@ -82,8 +83,10 @@ namespace RRM_SM.UI.ViewModels
         public ObservableCollection<BackupEntry> FilteredBackups
         {
             get => _filteredBackups;
-            set { _filteredBackups = value; OnPropertyChanged(); }
+            set { _filteredBackups = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasNoBackups)); }
         }
+
+        public bool HasNoBackups => FilteredBackups.Count == 0;
 
         public ObservableCollection<string> AvailableCampaignFilters
         {
@@ -203,6 +206,7 @@ namespace RRM_SM.UI.ViewModels
         public ICommand DeleteBackupCommand { get; }
         public ICommand RefreshBackupsCommand { get; }
         public ICommand OpenSelectedInExplorerCommand { get; }
+        public ICommand CopyBackupPathCommand { get; }
         public ICommand BrowseSaveDirCommand { get; }
         public ICommand BrowseBackupDirCommand { get; }
         public ICommand AutoDetectCommand { get; }
@@ -249,6 +253,15 @@ namespace RRM_SM.UI.ViewModels
             string? name = PromptForInput("Named Backup", $"Enter a tag / custom name for [{targetCampaign}] backup\n(e.g. 'Turn42_Siege', 'Before_Civil_War'):");
             if (string.IsNullOrWhiteSpace(name))
                 return;
+
+            char[] invalidChars = Path.GetInvalidFileNameChars();
+            string sanitized = new string(name.Where(c => !invalidChars.Contains(c)).ToArray()).Trim();
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                MessageBox.Show("The entered name contains only invalid characters for file names. Please enter a valid name.", "Invalid Name", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            name = sanitized;
 
             IsBusy = true;
             StatusMessage = $"Creating backup '{name}' for [{targetCampaign}]...";
@@ -411,6 +424,20 @@ namespace RRM_SM.UI.ViewModels
             OpenPathInExplorer(SelectedBackup.FullPath);
         }
 
+        private void ExecuteCopyBackupPath()
+        {
+            if (SelectedBackup == null) return;
+            try
+            {
+                Clipboard.SetText(SelectedBackup.FullPath);
+                StatusMessage = $"✔ Copied to clipboard: {SelectedBackup.FullPath}";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Failed to copy path: {ex.Message}";
+            }
+        }
+
         // ───────────────────── Settings / Path Operations ─────────────────────
 
         private void ExecuteBrowseSaveDir()
@@ -566,7 +593,7 @@ namespace RRM_SM.UI.ViewModels
             if (bytes >= 1024L * 1024 * 1024)
                 return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
             if (bytes >= 1024 * 1024)
-                return $"{bytes / (1024.0 * 1024 * 1024):F2} MB";
+                return $"{bytes / (1024.0 * 1024):F2} MB";
             if (bytes >= 1024)
                 return $"{bytes / 1024.0:F2} KB";
             return $"{bytes} B";

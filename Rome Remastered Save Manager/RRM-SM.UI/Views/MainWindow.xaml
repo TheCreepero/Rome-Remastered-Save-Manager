@@ -344,12 +344,40 @@
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
+                    <!-- Missing save folder warning banner -->
+                    <Border Grid.Row="0" Background="#3A1E1E" BorderBrush="{StaticResource AccentRed}" BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,8">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding GameSaveDirExists}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="⚠" Foreground="{StaticResource AccentRed}" FontWeight="Bold" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Game save folder not detected. Configure your save folder in Settings or click Auto-Detect."
+                                           Foreground="#FFFFFF" FontSize="12.5" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="_Auto-Detect Now" Command="{Binding AutoDetectCommand}" Style="{StaticResource PrimaryButton}" Padding="10,4" FontSize="12"
+                                    AutomationProperties.Name="Auto-Detect Game Save Directory"/>
+                        </Grid>
+                    </Border>
+
                     <!-- Action bar -->
-                    <WrapPanel Grid.Row="0" Margin="0,0,0,8">
+                    <WrapPanel Grid.Row="1" Margin="0,0,0,8">
                         <Border Background="#202036" CornerRadius="4" BorderBrush="{StaticResource ControlBorder}" BorderThickness="1" Padding="8,4" Margin="0,0,6,4" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="Active Campaign:" Foreground="{StaticResource AccentGold}" VerticalAlignment="Center" FontWeight="Bold" FontSize="12.5" Margin="0,0,8,0"/>
@@ -383,7 +411,7 @@
                     </WrapPanel>
 
                     <!-- Search + List -->
-                    <Border Grid.Row="1" Background="{StaticResource PanelBg}" CornerRadius="6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                    <Border Grid.Row="2" Background="{StaticResource PanelBg}" CornerRadius="6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -418,84 +446,130 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Data grid -->
-                            <DataGrid x:Name="BackupsDataGrid" Grid.Row="1"
-                                      ItemsSource="{Binding FilteredBackups}"
-                                      SelectedItem="{Binding SelectedBackup}"
-                                      AutoGenerateColumns="False"
-                                      IsReadOnly="True"
-                                      SelectionMode="Single"
-                                      HeadersVisibility="Column"
-                                      GridLinesVisibility="None"
-                                      Background="Transparent"
-                                      Foreground="#FFFFFF"
-                                      BorderThickness="0"
-                                      RowBackground="#2A2A44"
-                                      AlternatingRowBackground="#262640"
-                                      FontSize="12.5"
-                                      CanUserResizeRows="False"
-                                      PreviewKeyDown="BackupsDataGrid_PreviewKeyDown"
-                                      AutomationProperties.Name="Backups List"
-                                      AutomationProperties.HelpText="List of campaign backup archives. Press Enter to restore, Delete to remove.">
+                            <!-- Data grid container with empty state overlay -->
+                            <Grid Grid.Row="1">
+                                <DataGrid x:Name="BackupsDataGrid"
+                                          ItemsSource="{Binding FilteredBackups}"
+                                          SelectedItem="{Binding SelectedBackup}"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          SelectionMode="Single"
+                                          HeadersVisibility="Column"
+                                          GridLinesVisibility="None"
+                                          Background="Transparent"
+                                          Foreground="#FFFFFF"
+                                          BorderThickness="0"
+                                          RowBackground="#2A2A44"
+                                          AlternatingRowBackground="#262640"
+                                          FontSize="12.5"
+                                          CanUserResizeRows="False"
+                                          PreviewKeyDown="BackupsDataGrid_PreviewKeyDown"
+                                          AutomationProperties.Name="Backups List"
+                                          AutomationProperties.HelpText="List of campaign backup archives. Double-click or press Enter to restore, Delete to remove, right-click for options.">
 
-                                <DataGrid.ColumnHeaderStyle>
-                                    <Style TargetType="DataGridColumnHeader">
-                                        <Setter Property="Background" Value="#1E1E34"/>
-                                        <Setter Property="Foreground" Value="{StaticResource AccentGold}"/>
-                                        <Setter Property="Padding" Value="10,6"/>
-                                        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-                                        <Setter Property="BorderThickness" Value="0,0,1,1"/>
-                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                        <Setter Property="FontSize" Value="12"/>
-                                    </Style>
-                                </DataGrid.ColumnHeaderStyle>
+                                    <DataGrid.ColumnHeaderStyle>
+                                        <Style TargetType="DataGridColumnHeader">
+                                            <Setter Property="Background" Value="#1E1E34"/>
+                                            <Setter Property="Foreground" Value="{StaticResource AccentGold}"/>
+                                            <Setter Property="Padding" Value="10,6"/>
+                                            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+                                            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Setter Property="FontSize" Value="12"/>
+                                        </Style>
+                                    </DataGrid.ColumnHeaderStyle>
 
-                                <DataGrid.CellStyle>
-                                    <Style TargetType="DataGridCell">
-                                        <Setter Property="Padding" Value="8,5"/>
-                                        <Setter Property="BorderThickness" Value="0"/>
-                                        <Setter Property="FocusVisualStyle" Value="{StaticResource AccessibleFocusVisual}"/>
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="DataGridCell">
-                                                    <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
-                                                        <ContentPresenter VerticalAlignment="Center"/>
-                                                    </Border>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                        <Style.Triggers>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter Property="Background" Value="#404068"/>
-                                                <Setter Property="Foreground" Value="#FFFFFF"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </DataGrid.CellStyle>
+                                    <DataGrid.CellStyle>
+                                        <Style TargetType="DataGridCell">
+                                            <Setter Property="Padding" Value="8,5"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="FocusVisualStyle" Value="{StaticResource AccessibleFocusVisual}"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="DataGridCell">
+                                                        <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}">
+                                                            <ContentPresenter VerticalAlignment="Center"/>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter Property="Background" Value="#404068"/>
+                                                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGrid.CellStyle>
 
-                                <DataGrid.RowStyle>
-                                    <Style TargetType="DataGridRow">
-                                        <Setter Property="FocusVisualStyle" Value="{StaticResource AccessibleFocusVisual}"/>
-                                        <Style.Triggers>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter Property="Background" Value="#404068"/>
-                                            </Trigger>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#343458"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </DataGrid.RowStyle>
+                                    <DataGrid.RowStyle>
+                                        <Style TargetType="DataGridRow">
+                                            <Setter Property="FocusVisualStyle" Value="{StaticResource AccessibleFocusVisual}"/>
+                                            <EventSetter Event="MouseDoubleClick" Handler="DataGridRow_MouseDoubleClick"/>
+                                            <Setter Property="ContextMenu">
+                                                <Setter.Value>
+                                                    <ContextMenu Background="#25253E" BorderBrush="{StaticResource ControlBorder}">
+                                                        <MenuItem Header="↩ Restore Selected Backup..." Command="{Binding DataContext.RestoreCommand, RelativeSource={RelativeSource AncestorType=Window}}" Foreground="#FFFFFF"/>
+                                                        <MenuItem Header="📂 Reveal in File Explorer" Command="{Binding DataContext.OpenSelectedInExplorerCommand, RelativeSource={RelativeSource AncestorType=Window}}" Foreground="#FFFFFF"/>
+                                                        <MenuItem Header="📋 Copy Full Path" Command="{Binding DataContext.CopyBackupPathCommand, RelativeSource={RelativeSource AncestorType=Window}}" Foreground="#FFFFFF"/>
+                                                        <Separator Background="{StaticResource BorderBrush}"/>
+                                                        <MenuItem Header="🗑 Delete Backup..." Command="{Binding DataContext.DeleteBackupCommand, RelativeSource={RelativeSource AncestorType=Window}}" Foreground="{StaticResource AccentRed}"/>
+                                                    </ContextMenu>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter Property="Background" Value="#404068"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#343458"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGrid.RowStyle>
 
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Campaign / Faction" Binding="{Binding CampaignName}" Width="160"/>
-                                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" MinWidth="180"/>
-                                    <DataGridTextColumn Header="Date" Binding="{Binding CreatedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="155"/>
-                                    <DataGridTextColumn Header="Size" Binding="{Binding FormattedSize}" Width="90"/>
-                                    <DataGridTextColumn Header="Files" Binding="{Binding FileCount}" Width="55"/>
-                                    <DataGridTextColumn Header="Format" Binding="{Binding TypeLabel}" Width="65"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Campaign / Faction" Binding="{Binding CampaignName}" Width="160"/>
+                                        <DataGridTemplateColumn Header="Name" Width="*" MinWidth="180" SortMemberPath="Name">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Border Background="#5A4A20" CornerRadius="3" Padding="5,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsSafetyBackup}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <TextBlock Text="SAFETY" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentGold}"/>
+                                                        </Border>
+                                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="Date" Binding="{Binding CreatedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="155"/>
+                                        <DataGridTextColumn Header="Size" Binding="{Binding FormattedSize}" SortMemberPath="TotalSizeBytes" Width="90"/>
+                                        <DataGridTextColumn Header="Files" Binding="{Binding FileCount}" Width="55"/>
+                                        <DataGridTextColumn Header="Format" Binding="{Binding TypeLabel}" Width="65"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <!-- Empty State Overlay -->
+                                <Border Background="Transparent" IsHitTestVisible="False"
+                                        Visibility="{Binding HasNoBackups, Converter={StaticResource BoolToVis}}">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
+                                        <TextBlock Text="⚔" FontSize="36" HorizontalAlignment="Center" Foreground="#4A4A6A" Margin="0,0,0,8"/>
+                                        <TextBlock Text="No backups found" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource AccentGold}"/>
+                                        <TextBlock Text="Select an active campaign above and click '⚡ Quick Backup' to create your first snapshot!"
+                                                   FontSize="12" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
                         </Grid>
                     </Border>
                 </Grid>

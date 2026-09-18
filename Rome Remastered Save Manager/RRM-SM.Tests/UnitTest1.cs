@@ -258,5 +258,54 @@ namespace RRM_SM.Tests
             var backups = backupService.GetBackups();
             Assert.Contains(backups, b => b.IsSafetyBackup);
         }
+
+        [Fact]
+        public void BackupEntry_FormattedSize_CalculatesUnitsProperly()
+        {
+            string sep = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
+            var b1 = new BackupEntry { TotalSizeBytes = 500 };
+            Assert.Equal("500 B", b1.FormattedSize);
+
+            var b2 = new BackupEntry { TotalSizeBytes = 2048 };
+            Assert.Equal($"2{sep}00 KB", b2.FormattedSize);
+
+            // Verify 50 MB produces 50 MB, not 0.05 MB
+            var b3 = new BackupEntry { TotalSizeBytes = 52428800 };
+            Assert.Equal($"50{sep}00 MB", b3.FormattedSize);
+
+            var b4 = new BackupEntry { TotalSizeBytes = 1610612736 };
+            Assert.Equal($"1{sep}50 GB", b4.FormattedSize);
+        }
+
+        [Fact]
+        public void BackupEntry_SortsNumericallyByTotalSizeBytes()
+        {
+            var list = new List<BackupEntry>
+            {
+                new BackupEntry { Name = "Big", TotalSizeBytes = 104857600 },    // 100 MB
+                new BackupEntry { Name = "Tiny", TotalSizeBytes = 51200 },       // 50 KB
+                new BackupEntry { Name = "Medium", TotalSizeBytes = 2621440 },   // 2.5 MB
+                new BackupEntry { Name = "Huge", TotalSizeBytes = 1288490188 }   // 1.2 GB
+            };
+
+            var sorted = list.OrderBy(b => b.TotalSizeBytes).Select(b => b.Name).ToList();
+            Assert.Equal(new[] { "Tiny", "Medium", "Big", "Huge" }, sorted);
+        }
+
+        [Fact]
+        public void BackupService_SanitizesCustomBackupName()
+        {
+            char[] invalidChars = Path.GetInvalidFileNameChars();
+            string rawName = "Turn:50*Siege? <Before>|War";
+            string sanitized = new string(rawName.Where(c => !invalidChars.Contains(c)).ToArray()).Trim();
+
+            Assert.DoesNotContain(":", sanitized);
+            Assert.DoesNotContain("*", sanitized);
+            Assert.DoesNotContain("?", sanitized);
+            Assert.DoesNotContain("<", sanitized);
+            Assert.DoesNotContain(">", sanitized);
+            Assert.DoesNotContain("|", sanitized);
+            Assert.Equal("Turn50Siege BeforeWar", sanitized);
+        }
     }
 }

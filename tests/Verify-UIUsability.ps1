@@ -1,0 +1,255 @@
+# Automated UI & Usability Verification Script for Rome: Remastered Save Manager
+# Uses Windows UI Automation to inspect controls, names, help text, and accessibility properties.
+
+$ErrorActionPreference = "Stop"
+
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+
+$exePath = Join-Path $PSScriptRoot "..\Rome Remastered Save Manager\RRM-SM.UI\bin\Debug\net10.0-windows\RRM-SM.UI.exe"
+if (-not (Test-Path $exePath)) {
+    Write-Error "Could not find RRM-SM.UI.exe at: $exePath"
+    exit 1
+}
+
+Write-Host "=================================================================" -ForegroundColor Cyan
+Write-Host " STARTING AUTOMATED UI & USABILITY VERIFICATION TEST SUITE       " -ForegroundColor Cyan
+Write-Host " Target: $exePath" -ForegroundColor Cyan
+Write-Host "=================================================================" -ForegroundColor Cyan
+
+$process = Start-Process -FilePath $exePath -PassThru
+$passCount = 0
+$failCount = 0
+
+function Assert-Condition($condition, $message) {
+    if ($condition) {
+        Write-Host "  [PASS] $message" -ForegroundColor Green
+        $script:passCount++
+    } else {
+        Write-Host "  [FAIL] $message" -ForegroundColor Red
+        $script:failCount++
+    }
+}
+
+try {
+    # 1. Wait for window to appear
+    Write-Host "`n[1/4] Connecting to Application Window..." -ForegroundColor Yellow
+    $timeout = [DateTime]::Now.AddSeconds(10)
+    $window = $null
+
+    while ([DateTime]::Now -lt $timeout -and $null -eq $window) {
+        Start-Sleep -Milliseconds 500
+        $process.Refresh()
+        if ($process.MainWindowHandle -ne 0) {
+            try {
+                $candidate = [Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
+                if ($null -ne $candidate -and $candidate.Current.BoundingRectangle.Width -gt 200) {
+                    $window = $candidate
+                    break
+                }
+            } catch { }
+        }
+
+        $condition = New-Object Windows.Automation.PropertyCondition(
+            [Windows.Automation.AutomationElement]::ProcessIdProperty,
+            $process.Id
+        )
+        $all = [Windows.Automation.AutomationElement]::RootElement.FindAll(
+            [Windows.Automation.TreeScope]::Children,
+            $condition
+        )
+        foreach ($el in $all) {
+            if ($el.Current.Name -like "*Total War: ROME REMASTERED*" -or $el.Current.BoundingRectangle.Width -ge 500) {
+                $window = $el
+                break
+            }
+        }
+    }
+
+    Assert-Condition ($null -ne $window) "Application window opened and was found by UI Automation"
+    if ($null -eq $window) {
+        Write-Error "Application window failed to load within timeout."
+        exit 1
+    }
+
+    # 2. Window Title & Dimensions
+    Write-Host "`n[2/4] Verifying Window Properties & Minimum Dimensions..." -ForegroundColor Yellow
+    $windowName = $window.Current.Name
+    Assert-Condition ($windowName -like "*Total War: ROME REMASTERED*") "Window title matches: '$windowName'"
+
+    $bounds = $window.Current.BoundingRectangle
+    $width = $bounds.Width
+    $height = $bounds.Height
+    Assert-Condition ($width -ge 750) "Window Width ($width px) satisfies minimum threshold (750 px)"
+    Assert-Condition ($height -ge 500) "Window Height ($height px) satisfies minimum threshold (500 px)"
+
+    # 3. Inspect UI Automation Tree for Controls & Accessibility Properties
+    Write-Host "`n[3/4] Inspecting UI Controls, Automation Properties & Access Keys..." -ForegroundColor Yellow
+
+    # Helper to find elements by Name or ControlType
+    function Find-Descendants($root, $controlType) {
+        $cond = New-Object Windows.Automation.PropertyCondition(
+            [Windows.Automation.AutomationElement]::ControlTypeProperty,
+            $controlType
+        )
+        return $root.FindAll([Windows.Automation.TreeScope]::Descendants, $cond)
+    }
+
+    # Verify buttons
+    $buttons = Find-Descendants $window ([Windows.Automation.ControlType]::Button)
+    Write-Host "  Found $($buttons.Count) button controls in window tree." -ForegroundColor Gray
+    
+    $expectedButtons = @(
+        "Quick Backup",
+        "Named Backup",
+        "Backup All Campaigns",
+        "Restore Selected Backup",
+        "Delete Selected Backup",
+        "Open Selected Backup in File Explorer",
+        "Refresh Backups List"
+    )
+
+    foreach ($expected in $expectedButtons) {
+        $found = $false
+        foreach ($btn in $buttons) {
+            if ($btn.Current.Name -eq $expected -or $btn.Current.Name -like "*$expected*") {
+                $found = $true
+                $accessKey = $btn.Current.AccessKey
+                $helpText = $btn.Current.HelpText
+                Assert-Condition $true "Button '$expected' found with Name='$($btn.Current.Name)' | AccessKey='$accessKey' | HelpText='$helpText'"
+                break
+            }
+        }
+        if (-not $found) {
+            Assert-Condition $false "Button '$expected' was not found with expected AutomationProperties.Name"
+        }
+    }
+
+    # Verify comboboxes
+    $combos = Find-Descendants $window ([Windows.Automation.ControlType]::ComboBox)
+    Write-Host "  Found $($combos.Count) ComboBox controls in window tree." -ForegroundColor Gray
+    
+    $expectedCombos = @(
+        "Active Campaign Faction",
+        "Filter Backups by Faction"
+    )
+
+    foreach ($expected in $expectedCombos) {
+        $found = $false
+        foreach ($cmb in $combos) {
+            if ($cmb.Current.Name -like "*$expected*") {
+                $found = $true
+                $helpText = $cmb.Current.HelpText
+                Assert-Condition $true "ComboBox '$expected' found with Name='$($cmb.Current.Name)' | HelpText='$helpText'"
+                break
+            }
+        }
+        if (-not $found) {
+            Assert-Condition $false "ComboBox '$expected' was not found with expected AutomationProperties.Name"
+        }
+    }
+
+    # Verify Search Box
+    $edits = Find-Descendants $window ([Windows.Automation.ControlType]::Edit)
+    $searchFound = $false
+    foreach ($edit in $edits) {
+        if ($edit.Current.Name -like "*Search Backups*") {
+            $searchFound = $true
+            Assert-Condition $true "Search input found with Name='$($edit.Current.Name)' | HelpText='$($edit.Current.HelpText)'"
+            break
+        }
+    }
+    Assert-Condition $searchFound "Search input was found with AutomationProperties.Name"
+
+    # Verify DataGrid
+    $grids = Find-Descendants $window ([Windows.Automation.ControlType]::DataGrid)
+    $gridFound = $false
+    foreach ($grid in $grids) {
+        if ($grid.Current.Name -like "*Backups List*") {
+            $gridFound = $true
+            Assert-Condition $true "DataGrid found with Name='$($grid.Current.Name)' | HelpText='$($grid.Current.HelpText)'"
+            break
+        }
+    }
+    Assert-Condition $gridFound "Backups DataGrid was found with AutomationProperties.Name"
+
+    # Verify Status bar
+    $texts = Find-Descendants $window ([Windows.Automation.ControlType]::Text)
+    $statusFound = $false
+    foreach ($txt in $texts) {
+        if ($txt.Current.Name -like "*Status*") {
+            $statusFound = $true
+            Assert-Condition $true "Status message found with Name='$($txt.Current.Name)'"
+            break
+        }
+    }
+    Assert-Condition $statusFound "Status message element was found with AutomationProperties.Name"
+
+    # 4. Tab Navigation & Settings Tab Inspection
+    Write-Host "`n[4/5] Testing Tab Navigation & Settings Controls..." -ForegroundColor Yellow
+    $tabItems = Find-Descendants $window ([Windows.Automation.ControlType]::TabItem)
+    $settingsTab = $null
+    foreach ($tab in $tabItems) {
+        if ($tab.Current.Name -like "*Settings*") {
+            $settingsTab = $tab
+            break
+        }
+    }
+    Assert-Condition ($null -ne $settingsTab) "Settings Tab was found in UI"
+    if ($null -ne $settingsTab) {
+        try {
+            $selPattern = $settingsTab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern)
+            $selPattern.Select()
+            Start-Sleep -Milliseconds 400
+            Assert-Condition $true "Selected Settings Tab successfully"
+
+            # Verify settings controls
+            $settingsButtons = Find-Descendants $window ([Windows.Automation.ControlType]::Button)
+            $saveSettingsFound = $false
+            foreach ($b in $settingsButtons) {
+                if ($b.Current.Name -like "*Save Settings*") {
+                    $saveSettingsFound = $true
+                    Assert-Condition $true "Button 'Save Settings' found with Name='$($b.Current.Name)'"
+                    break
+                }
+            }
+            Assert-Condition $saveSettingsFound "Save Settings button was found on Settings tab"
+        } catch {
+            Assert-Condition $false "Failed to interact with Settings Tab: $_"
+        }
+    }
+
+    # 5. Clean Application Shutdown
+    Write-Host "`n[5/5] Testing Clean Application Shutdown..." -ForegroundColor Yellow
+    $windowPattern = $null
+    try {
+        $windowPattern = $window.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern)
+    } catch { }
+
+    if ($null -ne $windowPattern) {
+        $windowPattern.Close()
+        $closed = $process.WaitForExit(4000)
+        Assert-Condition $closed "Application closed cleanly via WindowPattern.Close()"
+    } else {
+        $process.CloseMainWindow()
+        $closed = $process.WaitForExit(4000)
+        Assert-Condition $closed "Application closed cleanly via CloseMainWindow()"
+    }
+
+} finally {
+    if (-not $process.HasExited) {
+        Write-Host "  Terminating remaining test process..." -ForegroundColor Gray
+        $process.Kill()
+        $process.WaitForExit(2000)
+    }
+}
+
+Write-Host "`n=================================================================" -ForegroundColor Cyan
+Write-Host " AUTOMATED TEST RESULTS: $passCount PASSED, $failCount FAILED" -ForegroundColor $(if ($failCount -eq 0) { "Green" } else { "Red" })
+Write-Host "=================================================================" -ForegroundColor Cyan
+
+if ($failCount -gt 0) {
+    exit 1
+} else {
+    exit 0
+}
