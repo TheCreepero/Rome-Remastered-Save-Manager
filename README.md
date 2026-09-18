@@ -1,6 +1,6 @@
 # Total War: ROME REMASTERED — Save Manager
 
-A friendly, robust save manager and backup utility for **Total War: ROME REMASTERED**. Available as both an intuitive **Desktop GUI** (WPF) and an **Interactive CLI tool** (.NET 8).
+A friendly, robust save manager and backup utility for **Total War: ROME REMASTERED**. Available as both an intuitive **Desktop GUI** (WPF) and an **Interactive CLI tool** (.NET 10).
 
 ---
 
@@ -57,8 +57,8 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 ## Prerequisites
 
 - **Operating System**: Windows 10 or Windows 11 (64-bit)
-- **Runtime**: [.NET 8.0 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) (or [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) if building/running from source code)
-  - *Note for GUI*: Ensure the **.NET Desktop Runtime 8.0** is installed on Windows.
+- **Runtime**: [.NET 10.0 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (or [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) if building/running from source code)
+  - *Note for GUI*: Ensure the **.NET Desktop Runtime 10.0** is installed on Windows.
 - **Game**: Total War: ROME REMASTERED installed on PC (Steam or Feral Interactive release).
 
 ---
@@ -67,7 +67,7 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 
 ### Option 1: Run via .NET CLI
 
-If you have the .NET 8 SDK installed:
+If you have the .NET 10 SDK installed:
 
 ```bash
 # Launch the Desktop GUI
@@ -81,7 +81,7 @@ dotnet run --project "Rome Remastered Save Manager/RRM-SM/RRM-SM.csproj"
 
 Navigate to the project build folder and double-click:
 ```text
-Rome Remastered Save Manager\RRM-SM.UI\bin\Debug\net8.0-windows\RRM-SM.UI.exe
+Rome Remastered Save Manager\RRM-SM.UI\bin\Debug\net10.0-windows\RRM-SM.UI.exe
 ```
 
 ---
