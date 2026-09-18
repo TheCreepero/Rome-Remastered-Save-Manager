@@ -301,6 +301,43 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Launch Game Steam Button -->
+                    <Button Command="{Binding LaunchGameCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            Padding="10,5" Margin="0,0,12,0"
+                            VerticalAlignment="Center"
+                            ToolTip="Launch Total War: ROME REMASTERED via Steam"
+                            AutomationProperties.Name="Launch Game via Steam">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚔ " FontSize="12" Foreground="{StaticResource AccentGold}"/>
+                            <TextBlock Text="Launch Game" FontSize="12" Foreground="{StaticResource AccentGold}" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Sentinel Quick Toggle / Status Pill -->
+                    <Button Command="{Binding ToggleWatcherCommand}"
+                            Style="{StaticResource ActionButton}"
+                            Padding="9,5" Margin="0,0,16,0"
+                            VerticalAlignment="Center"
+                            ToolTip="Click to toggle Autosave Sentinel (automatic background backups)"
+                            AutomationProperties.Name="Toggle Autosave Sentinel">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Fill" Value="{StaticResource TextSecondary}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsWatcherRunning}" Value="True">
+                                                <Setter Property="Fill" Value="{StaticResource AccentGreen}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Text="{Binding WatcherStatusText}" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
                     <TextBlock Text="Backups:" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,5,0"/>
                     <TextBlock Text="{Binding TotalBackupCount}" Foreground="{StaticResource AccentBlue}" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,15,0"/>
                     <TextBlock Text="Total Size:" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,5,0"/>
@@ -730,6 +767,73 @@
                                              VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
                                              AutomationProperties.Name="Max Backups to Keep per Campaign"/>
                                     <TextBlock Grid.Column="2" Text="(0 = Unlimited per campaign)" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="12"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Automation & Desktop Integration -->
+                        <Border Background="{StaticResource CardBg}" CornerRadius="6" Padding="16,12" Margin="0,0,0,10"
+                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="AUTOMATION &amp; DESKTOP INTEGRATION" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource AccentGold}" Margin="0,0,0,10"/>
+
+                                <!-- Autosave Sentinel Toggle -->
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Autosave Sentinel:" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" FontSize="13"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <CheckBox IsChecked="{Binding AutoWatcherEnabled}" VerticalAlignment="Center"
+                                                  AutomationProperties.Name="Enable Autosave Sentinel background watcher"/>
+                                        <TextBlock Text="Automatically backup saves when Rome Remastered writes to disk" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="6,0,0,0" FontSize="12.5"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Desktop Notifications Toggle -->
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Windows Notifications:" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" FontSize="13"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <CheckBox IsChecked="{Binding ShowNotifications}" VerticalAlignment="Center"
+                                                  AutomationProperties.Name="Show Windows notifications on automated backup"/>
+                                        <TextBlock Text="Display desktop notification when a snapshot is created" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="6,0,0,0" FontSize="12.5"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Minimize to System Tray -->
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="System Tray:" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" FontSize="13"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <CheckBox IsChecked="{Binding MinimizeToTray}" VerticalAlignment="Center"
+                                                  AutomationProperties.Name="Minimize or close application to System Tray"/>
+                                        <TextBlock Text="Keep running in system tray on close / minimize" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="6,0,0,0" FontSize="12.5"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Debounce Window -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Save Detection Buffer:" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" FontSize="13"/>
+                                    <TextBox Grid.Column="1" Width="70"
+                                             Text="{Binding AutoWatcherDebounceMs, UpdateSourceTrigger=PropertyChanged}"
+                                             Background="#22223A" Foreground="#FFFFFF"
+                                             BorderBrush="{StaticResource ControlBorder}" Padding="6,4" FontSize="13"
+                                             VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                             AutomationProperties.Name="Save detection debounce buffer in milliseconds"/>
+                                    <TextBlock Grid.Column="2" Text="ms (default: 1500 ms to ensure complete file write)" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="12"/>
                                 </Grid>
                             </StackPanel>
                         </Border>

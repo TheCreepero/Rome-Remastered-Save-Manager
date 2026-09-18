@@ -100,6 +100,8 @@ try {
     Write-Host "  Found $($buttons.Count) button controls in window tree." -ForegroundColor Gray
     
     $expectedButtons = @(
+        "Launch Game via Steam",
+        "Toggle Autosave Sentinel",
         "Quick Backup",
         "Named Backup",
         "Backup All Campaigns",
@@ -214,13 +216,46 @@ try {
                 }
             }
             Assert-Condition $saveSettingsFound "Save Settings button was found on Settings tab"
+
+            # Verify Automation & Desktop checkboxes
+            $checkBoxes = Find-Descendants $window ([Windows.Automation.ControlType]::CheckBox)
+            $expectedCheckBoxes = @(
+                "Enable Autosave Sentinel background watcher",
+                "Show Windows notifications on automated backup",
+                "Minimize or close application to System Tray"
+            )
+
+            foreach ($expectedCb in $expectedCheckBoxes) {
+                $cbFound = $false
+                foreach ($cb in $checkBoxes) {
+                    if ($cb.Current.Name -like "*$expectedCb*") {
+                        $cbFound = $true
+                        Assert-Condition $true "CheckBox '$expectedCb' found with Name='$($cb.Current.Name)'"
+                        break
+                    }
+                }
+                Assert-Condition $cbFound "CheckBox '$expectedCb' was found on Settings tab"
+            }
+
+            # Verify Debounce buffer edit box
+            $settingsEdits = Find-Descendants $window ([Windows.Automation.ControlType]::Edit)
+            $debounceFound = $false
+            foreach ($ed in $settingsEdits) {
+                if ($ed.Current.Name -like "*debounce buffer*") {
+                    $debounceFound = $true
+                    Assert-Condition $true "Edit control found with Name='$($ed.Current.Name)'"
+                    break
+                }
+            }
+            Assert-Condition $debounceFound "Debounce buffer edit control was found on Settings tab"
+
         } catch {
             Assert-Condition $false "Failed to interact with Settings Tab: $_"
         }
     }
 
-    # 5. Clean Application Shutdown
-    Write-Host "`n[5/5] Testing Clean Application Shutdown..." -ForegroundColor Yellow
+    # 5. System Tray Minimization on Close
+    Write-Host "`n[5/5] Testing System Tray Minimization & Protection on Window Close..." -ForegroundColor Yellow
     $windowPattern = $null
     try {
         $windowPattern = $window.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern)
@@ -228,13 +263,14 @@ try {
 
     if ($null -ne $windowPattern) {
         $windowPattern.Close()
-        $closed = $process.WaitForExit(4000)
-        Assert-Condition $closed "Application closed cleanly via WindowPattern.Close()"
     } else {
         $process.CloseMainWindow()
-        $closed = $process.WaitForExit(4000)
-        Assert-Condition $closed "Application closed cleanly via CloseMainWindow()"
     }
+
+    Start-Sleep -Milliseconds 800
+    # Process should NOT have terminated (protected by MinimizeToTray)
+    Assert-Condition (-not $process.HasExited) "Process remained alive after window close (MinimizeToTray active)"
+    Assert-Condition ($window.Current.IsOffscreen) "Window is hidden from view into System Tray"
 
 } finally {
     if (-not $process.HasExited) {

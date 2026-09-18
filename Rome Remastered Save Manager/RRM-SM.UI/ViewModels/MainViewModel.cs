@@ -10,6 +10,10 @@ using System.Windows;
 using System.Windows.Input;
 using RRM_SM.Models;
 using RRM_SM.Services;
+using RRM_SM.UI.Services;
+using MessageBox = System.Windows.MessageBox;
+using Clipboard = System.Windows.Clipboard;
+using Application = System.Windows.Application;
 
 namespace RRM_SM.UI.ViewModels
 {
@@ -32,6 +36,15 @@ namespace RRM_SM.UI.ViewModels
         private string _statusMessage = "Ready.";
         private bool _isBusy;
 
+        private readonly SaveWatcherService _watcherService;
+        private readonly TrayService _trayService;
+
+        // Automation & Desktop properties
+        private bool _autoWatcherEnabled;
+        private bool _showNotifications;
+        private bool _minimizeToTray;
+        private int _autoWatcherDebounceMs;
+
         // Path properties
         private string _gameSaveDirectory = string.Empty;
         private string _backupDirectory = string.Empty;
@@ -41,6 +54,10 @@ namespace RRM_SM.UI.ViewModels
         private bool _backupDirExists;
         private int _totalBackupCount;
         private string _totalBackupSize = "0 B";
+
+        public Action? RestoreWindowRequested { get; set; }
+        public Action? ExitApplicationRequested { get; set; }
+        public TrayService TrayService => _trayService;
 
         public MainViewModel()
         {
@@ -53,6 +70,46 @@ namespace RRM_SM.UI.ViewModels
             _backupDirectory = _config.BackupDirectory;
             _compressBackups = _config.CompressBackups;
             _maxBackupsToKeep = _config.MaxBackupsToKeep;
+            _autoWatcherEnabled = _config.AutoWatcherEnabled;
+            _showNotifications = _config.ShowNotifications;
+            _minimizeToTray = _config.MinimizeToTray;
+            _autoWatcherDebounceMs = _config.AutoWatcherDebounceMs > 0 ? _config.AutoWatcherDebounceMs : 1500;
+
+            // Tray Service
+            _trayService = new TrayService { ShowNotifications = _showNotifications };
+            _trayService.OpenRequested += () => RestoreWindowRequested?.Invoke();
+            _trayService.LaunchGameRequested += ExecuteLaunchGame;
+            _trayService.ToggleWatcherRequested += ExecuteToggleWatcher;
+            _trayService.QuickBackupRequested += ExecuteQuickBackup;
+            _trayService.ExitRequested += () => ExitApplicationRequested?.Invoke();
+            _trayService.Initialize();
+
+            // Watcher Service
+            _watcherService = new SaveWatcherService(_config, _backupService);
+            _watcherService.BackupCreated += (s, e) =>
+            {
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    ExecuteRefreshBackups();
+                    StatusMessage = $"🛡 Autosave Sentinel: Backed up '{e.CampaignName}'.";
+                });
+
+                _trayService.ShowNotification(
+                    "Autosave Sentinel",
+                    $"Created snapshot for {e.CampaignName} ({Path.GetFileName(e.ChangedFile)})",
+                    System.Windows.Forms.ToolTipIcon.Info);
+            };
+
+            _watcherService.StatusChanged += (s, msg) =>
+            {
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    StatusMessage = msg;
+                    OnPropertyChanged(nameof(IsWatcherRunning));
+                    OnPropertyChanged(nameof(WatcherStatusText));
+                    _trayService.UpdateWatcherState(IsWatcherRunning);
+                });
+            };
 
             // Commands
             QuickBackupCommand = new RelayCommand(ExecuteQuickBackup, () => !IsBusy);
@@ -63,6 +120,9 @@ namespace RRM_SM.UI.ViewModels
             RefreshBackupsCommand = new RelayCommand(ExecuteRefreshBackups, () => !IsBusy);
             OpenSelectedInExplorerCommand = new RelayCommand(ExecuteOpenSelectedInExplorer, () => SelectedBackup != null);
             CopyBackupPathCommand = new RelayCommand(ExecuteCopyBackupPath, () => SelectedBackup != null);
+
+            ToggleWatcherCommand = new RelayCommand(ExecuteToggleWatcher);
+            LaunchGameCommand = new RelayCommand(ExecuteLaunchGame);
 
             BrowseSaveDirCommand = new RelayCommand(ExecuteBrowseSaveDir);
             BrowseBackupDirCommand = new RelayCommand(ExecuteBrowseBackupDir);
@@ -76,6 +136,12 @@ namespace RRM_SM.UI.ViewModels
             // Initial load
             RefreshPathStatuses();
             ExecuteRefreshBackups();
+
+            if (_autoWatcherEnabled && GameSaveDirExists)
+            {
+                _watcherService.Start();
+            }
+            _trayService.UpdateWatcherState(_watcherService.IsRunning);
         }
 
         // ───────────────────── Properties ─────────────────────
@@ -173,6 +239,64 @@ namespace RRM_SM.UI.ViewModels
             set { _maxBackupsToKeep = value; OnPropertyChanged(); }
         }
 
+        public bool AutoWatcherEnabled
+        {
+            get => _autoWatcherEnabled;
+            set
+            {
+                if (_autoWatcherEnabled != value)
+                {
+                    _autoWatcherEnabled = value;
+                    OnPropertyChanged();
+                    UpdateWatcherService();
+                }
+            }
+        }
+
+        public bool ShowNotifications
+        {
+            get => _showNotifications;
+            set
+            {
+                if (_showNotifications != value)
+                {
+                    _showNotifications = value;
+                    OnPropertyChanged();
+                    _trayService.ShowNotifications = value;
+                }
+            }
+        }
+
+        public bool MinimizeToTray
+        {
+            get => _minimizeToTray;
+            set
+            {
+                if (_minimizeToTray != value)
+                {
+                    _minimizeToTray = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public int AutoWatcherDebounceMs
+        {
+            get => _autoWatcherDebounceMs;
+            set
+            {
+                if (_autoWatcherDebounceMs != value)
+                {
+                    _autoWatcherDebounceMs = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool IsWatcherRunning => _watcherService.IsRunning;
+
+        public string WatcherStatusText => IsWatcherRunning ? "Sentinel: Active" : "Sentinel: Off";
+
         public bool GameSaveDirExists
         {
             get => _gameSaveDirExists;
@@ -207,6 +331,8 @@ namespace RRM_SM.UI.ViewModels
         public ICommand RefreshBackupsCommand { get; }
         public ICommand OpenSelectedInExplorerCommand { get; }
         public ICommand CopyBackupPathCommand { get; }
+        public ICommand ToggleWatcherCommand { get; }
+        public ICommand LaunchGameCommand { get; }
         public ICommand BrowseSaveDirCommand { get; }
         public ICommand BrowseBackupDirCommand { get; }
         public ICommand AutoDetectCommand { get; }
@@ -503,6 +629,48 @@ namespace RRM_SM.UI.ViewModels
             }
         }
 
+        public void ExecuteToggleWatcher()
+        {
+            AutoWatcherEnabled = !AutoWatcherEnabled;
+            ExecuteSaveSettings();
+        }
+
+        public void ExecuteLaunchGame()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo("steam://run/885970") { UseShellExecute = true });
+                StatusMessage = "⚔ Rome Remastered launch signal sent to Steam.";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Steam launch failed: {ex.Message}";
+                MessageBox.Show($"Could not trigger Steam launch:\n{ex.Message}\n\nPlease ensure Steam is installed and running.", "Steam Launch", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void UpdateWatcherService()
+        {
+            if (_autoWatcherEnabled && GameSaveDirExists)
+            {
+                if (!_watcherService.IsRunning)
+                {
+                    _watcherService.Start();
+                }
+            }
+            else
+            {
+                if (_watcherService.IsRunning)
+                {
+                    _watcherService.Stop();
+                }
+            }
+
+            OnPropertyChanged(nameof(IsWatcherRunning));
+            OnPropertyChanged(nameof(WatcherStatusText));
+            _trayService.UpdateWatcherState(IsWatcherRunning);
+        }
+
         private void ExecuteSaveSettings()
         {
             SyncConfigFromViewModel();
@@ -510,6 +678,7 @@ namespace RRM_SM.UI.ViewModels
             _backupService = new BackupService(_config);
             RefreshPathStatuses();
             ExecuteRefreshBackups();
+            UpdateWatcherService();
             StatusMessage = "✔ Settings saved.";
         }
 
@@ -524,8 +693,18 @@ namespace RRM_SM.UI.ViewModels
             BackupDirectory = Path.Combine(docs, "Rome Remastered Backups");
             CompressBackups = false;
             MaxBackupsToKeep = 0;
+            AutoWatcherEnabled = false;
+            ShowNotifications = true;
+            MinimizeToTray = true;
+            AutoWatcherDebounceMs = 1500;
             ExecuteSaveSettings();
             StatusMessage = "✔ Settings reset to defaults.";
+        }
+
+        public void Cleanup()
+        {
+            _watcherService.Dispose();
+            _trayService.Dispose();
         }
 
         // ───────────────────── Helpers ─────────────────────
@@ -536,6 +715,10 @@ namespace RRM_SM.UI.ViewModels
             _config.BackupDirectory = BackupDirectory;
             _config.CompressBackups = CompressBackups;
             _config.MaxBackupsToKeep = MaxBackupsToKeep;
+            _config.AutoWatcherEnabled = AutoWatcherEnabled;
+            _config.ShowNotifications = ShowNotifications;
+            _config.MinimizeToTray = MinimizeToTray;
+            _config.AutoWatcherDebounceMs = AutoWatcherDebounceMs;
         }
 
         private void RefreshPathStatuses()

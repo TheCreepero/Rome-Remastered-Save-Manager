@@ -3,11 +3,16 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
 using RRM_SM.UI.ViewModels;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using Application = System.Windows.Application;
 
 namespace RRM_SM.UI.Views
 {
     public partial class MainWindow : Window
     {
+        private bool _isExplicitExit;
+        private bool _hasShownTrayNotice;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -17,6 +22,11 @@ namespace RRM_SM.UI.Views
             // Wire up dialog callbacks (keeps ViewModel free of WPF UI dependencies)
             viewModel.InputDialogRequested = ShowInputDialog;
             viewModel.FolderBrowserRequested = ShowFolderBrowser;
+            viewModel.RestoreWindowRequested = RestoreWindow;
+            viewModel.ExitApplicationRequested = ExitApplication;
+
+            Closing += MainWindow_Closing;
+            StateChanged += MainWindow_StateChanged;
 
             DataContext = viewModel;
         }
@@ -130,6 +140,57 @@ namespace RRM_SM.UI.Views
 
             bool? result = dialog.ShowDialog(this);
             return result == true ? dialog.FolderName : null;
+        }
+
+        private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.MinimizeToTray && !_isExplicitExit)
+            {
+                e.Cancel = true;
+                Hide();
+
+                if (!_hasShownTrayNotice && vm.ShowNotifications)
+                {
+                    _hasShownTrayNotice = true;
+                    vm.TrayService.ShowNotification(
+                        "Rome Remastered Save Manager",
+                        "Save Manager is running in the background. Double-click tray icon to restore.");
+                }
+            }
+            else
+            {
+                if (DataContext is MainViewModel mainVm)
+                {
+                    mainVm.Cleanup();
+                }
+            }
+        }
+
+        private void MainWindow_StateChanged(object? sender, EventArgs e)
+        {
+            if (WindowState == WindowState.Minimized && DataContext is MainViewModel vm && vm.MinimizeToTray)
+            {
+                Hide();
+            }
+        }
+
+        private void RestoreWindow()
+        {
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
+            Focus();
+        }
+
+        private void ExitApplication()
+        {
+            _isExplicitExit = true;
+            if (DataContext is MainViewModel vm)
+            {
+                vm.Cleanup();
+            }
+            Close();
+            Application.Current.Shutdown();
         }
     }
 }
