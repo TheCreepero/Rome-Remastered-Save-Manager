@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using RRM_SM.Models;
+using RRM_SM.Core.Security;
 
 namespace RRM_SM.Services
 {
@@ -194,11 +195,18 @@ namespace RRM_SM.Services
             // Fallback for direct file restore if not found in vault manifest
             if (File.Exists(backup.FullPath))
             {
+                string fullBackupDir = Path.GetFullPath(_config.BackupDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                string fullBackupPath = Path.GetFullPath(backup.FullPath);
+                if (!fullBackupPath.StartsWith(fullBackupDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new UnauthorizedAccessException($"Access denied: Backup path '{fullBackupPath}' is outside the backup directory.");
+                }
+
                 string destName = !string.IsNullOrWhiteSpace(backup.OriginalGameFileName)
                     ? backup.OriginalGameFileName
                     : Path.GetFileName(backup.FullPath);
 
-                string targetGamePath = Path.Combine(_config.GameSaveDirectory, destName);
+                string targetGamePath = PathSecurity.EnsureSafeChildPath(_config.GameSaveDirectory, destName);
                 if (createSafetyBackup && File.Exists(targetGamePath))
                 {
                     try
@@ -214,6 +222,13 @@ namespace RRM_SM.Services
 
             if (Directory.Exists(backup.FullPath))
             {
+                string fullBackupDir = Path.GetFullPath(_config.BackupDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                string fullBackupPath = Path.GetFullPath(backup.FullPath);
+                if (!fullBackupPath.StartsWith(fullBackupDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new UnauthorizedAccessException($"Access denied: Backup path '{fullBackupPath}' is outside the backup directory.");
+                }
+
                 CopyDirectoryRecursive(backup.FullPath, _config.GameSaveDirectory);
             }
         }
@@ -224,6 +239,15 @@ namespace RRM_SM.Services
             {
                 _vaultService.DeleteSave(backup.VaultId);
                 return;
+            }
+
+            if (string.IsNullOrWhiteSpace(backup.FullPath)) return;
+
+            string fullBackupDir = Path.GetFullPath(_config.BackupDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            string fullBackupPath = Path.GetFullPath(backup.FullPath);
+            if (!fullBackupPath.StartsWith(fullBackupDir, StringComparison.OrdinalIgnoreCase))
+            {
+                return; // Refuse to delete outside backup directory
             }
 
             if (File.Exists(backup.FullPath))

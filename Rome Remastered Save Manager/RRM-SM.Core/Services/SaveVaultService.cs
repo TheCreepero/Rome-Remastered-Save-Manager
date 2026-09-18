@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using RRM_SM.Models;
 using RRM_SM.Core.Models;
+using RRM_SM.Core.Security;
 
 namespace RRM_SM.Services
 {
@@ -279,7 +280,7 @@ namespace RRM_SM.Services
 
             lock (_lock)
             {
-                string vaultFilePath = Path.Combine(_config.BackupDirectory, item.StoredFileName);
+                string vaultFilePath = PathSecurity.EnsureSafeChildPath(_config.BackupDirectory, item.StoredFileName);
                 if (!File.Exists(vaultFilePath))
                 {
                     throw new FileNotFoundException($"Vault save file missing from disk: {vaultFilePath}");
@@ -290,7 +291,7 @@ namespace RRM_SM.Services
                     Directory.CreateDirectory(_config.GameSaveDirectory);
                 }
 
-                string targetGamePath = Path.Combine(_config.GameSaveDirectory, item.OriginalGameFileName);
+                string targetGamePath = PathSecurity.EnsureSafeChildPath(_config.GameSaveDirectory, item.OriginalGameFileName);
 
                 // 1. Safety backup of the existing save before overwriting
                 if (createSafetyBackup && File.Exists(targetGamePath))
@@ -331,8 +332,7 @@ namespace RRM_SM.Services
                 var item = _manifest.Saves.FirstOrDefault(s => s.Id == id);
                 if (item == null) return;
 
-                string filePath = Path.Combine(_config.BackupDirectory, item.StoredFileName);
-                if (File.Exists(filePath))
+                if (PathSecurity.TryGetSafeChildPath(_config.BackupDirectory, item.StoredFileName, out var filePath) && File.Exists(filePath))
                 {
                     try { File.Delete(filePath); } catch { }
                 }
@@ -1308,7 +1308,9 @@ namespace RRM_SM.Services
             {
                 _manifest.LastUpdated = DateTime.Now;
                 string json = JsonSerializer.Serialize(_manifest, JsonOptions);
-                File.WriteAllText(_manifestPath, json);
+                string tempPath = _manifestPath + ".tmp";
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, _manifestPath, overwrite: true);
             }
             catch { }
         }
@@ -1354,7 +1356,10 @@ namespace RRM_SM.Services
             string nameWithoutExt = Path.GetFileNameWithoutExtension(storedFileName);
 
             // Match pattern like _YYYY-MM-DD_HH-mm-ss
-            var regex = new System.Text.RegularExpressions.Regex(@"_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}(?:_\d+)?$");
+            var regex = new System.Text.RegularExpressions.Regex(
+                @"_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}(?:_\d+)?$",
+                System.Text.RegularExpressions.RegexOptions.None,
+                TimeSpan.FromMilliseconds(250));
             if (regex.IsMatch(nameWithoutExt))
             {
                 return regex.Replace(nameWithoutExt, "") + ext;

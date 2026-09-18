@@ -1171,7 +1171,8 @@ namespace RRM_SM.UI.ViewModels
             try
             {
                 string html = _chronicleService.GenerateHtmlReport(_currentChronicle);
-                string path = Path.Combine(Path.GetTempPath(), $"{_currentChronicle.CampaignName}_Chronicle.html");
+                string safeCampaignName = BackupService.SanitizeFileName(_currentChronicle.CampaignName);
+                string path = Path.Combine(Path.GetTempPath(), $"{safeCampaignName}_Chronicle.html");
                 File.WriteAllText(path, html);
                 
                 Process.Start(new ProcessStartInfo
@@ -1284,15 +1285,21 @@ namespace RRM_SM.UI.ViewModels
             if (string.IsNullOrWhiteSpace(path)) return;
             try
             {
-                if (File.Exists(path))
+                string fullPath = Path.GetFullPath(path);
+                if (File.Exists(fullPath))
                 {
-                    Process.Start("explorer.exe", $"/select,\"{path}\"");
+                    var psi = new ProcessStartInfo("explorer.exe")
+                    {
+                        UseShellExecute = false
+                    };
+                    psi.ArgumentList.Add($"/select,{fullPath}");
+                    Process.Start(psi);
                 }
-                else if (Directory.Exists(path))
+                else if (Directory.Exists(fullPath))
                 {
                     Process.Start(new ProcessStartInfo
                     {
-                        FileName = path,
+                        FileName = fullPath,
                         UseShellExecute = true,
                         Verb = "open"
                     });

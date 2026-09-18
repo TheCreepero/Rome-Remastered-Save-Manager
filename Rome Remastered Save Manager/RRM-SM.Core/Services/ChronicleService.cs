@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text;
 using RRM_SM.Models;
 using RRM_SM.Core.Models;
+using RRM_SM.Core.Security;
 
 namespace RRM_SM.Services
 {
@@ -26,19 +27,17 @@ namespace RRM_SM.Services
         {
             if (!string.IsNullOrWhiteSpace(campaignId))
             {
-                string idPath = Path.Combine(_config.BackupDirectory, $"chronicle_{campaignId}.json");
+                string cleanId = BackupService.SanitizeFileName(campaignId);
+                string idPath = PathSecurity.EnsureSafeChildPath(_config.BackupDirectory, $"chronicle_{cleanId}.json");
                 if (File.Exists(idPath)) return idPath;
             }
 
             string cleanCampaign = CampaignParserService.CleanFactionName(campaignName);
-            string flatPath = Path.Combine(_config.BackupDirectory, $"chronicle_{cleanCampaign}.json");
+            string flatPath = PathSecurity.EnsureSafeChildPath(_config.BackupDirectory, $"chronicle_{cleanCampaign}.json");
             if (File.Exists(flatPath)) return flatPath;
 
-            string legacyPath = Path.Combine(_config.BackupDirectory, cleanCampaign, "chronicle.json");
-            if (File.Exists(legacyPath)) return legacyPath;
-
             return !string.IsNullOrWhiteSpace(campaignId)
-                ? Path.Combine(_config.BackupDirectory, $"chronicle_{campaignId}.json")
+                ? PathSecurity.EnsureSafeChildPath(_config.BackupDirectory, $"chronicle_{BackupService.SanitizeFileName(campaignId)}.json")
                 : flatPath;
         }
 
@@ -197,7 +196,9 @@ namespace RRM_SM.Services
             var chronicleFile = GetChronicleFilePath(chronicle.CampaignName, chronicle.CampaignId);
             var options = new JsonSerializerOptions { WriteIndented = true };
             string json = JsonSerializer.Serialize(chronicle, options);
-            File.WriteAllText(chronicleFile, json);
+            string tempPath = chronicleFile + ".tmp";
+            File.WriteAllText(tempPath, json);
+            File.Move(tempPath, chronicleFile, overwrite: true);
         }
 
         public string GenerateMarkdownReport(CampaignChronicle chronicle)
@@ -251,7 +252,7 @@ namespace RRM_SM.Services
             sb.AppendLine("<head>");
             sb.AppendLine("    <meta charset=\"UTF-8\">");
             sb.AppendLine("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
-            sb.AppendLine($"    <title>{chronicle.CampaignName} - Campaign Chronicle</title>");
+            sb.AppendLine($"    <title>{System.Net.WebUtility.HtmlEncode(chronicle.CampaignName)} - Campaign Chronicle</title>");
             sb.AppendLine("    <style>");
             sb.AppendLine("        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f1ea; color: #333; line-height: 1.6; padding: 20px; }");
             sb.AppendLine("        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #b71c1c; }");

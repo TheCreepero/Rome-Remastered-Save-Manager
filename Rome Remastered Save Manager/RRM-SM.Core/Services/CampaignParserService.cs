@@ -9,21 +9,27 @@ namespace RRM_SM.Services
 {
     public class CampaignParserService
     {
+        private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(250);
+
         private static readonly Regex AutosaveRegex = new(
             @"^save_Autosave\s+(?<faction>.+?)\s+Turn\s*(?<turn>\d+)(?:\s+(?<suffix>Start|End))?\.sav$",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            RegexOptions.IgnoreCase | RegexOptions.Compiled,
+            RegexTimeout);
 
         private static readonly Regex DelimitedSaveRegex = new(
             @"^save_(?<faction>.+?)\s*[-_]\s*(?<details>.+)\.sav$",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            RegexOptions.IgnoreCase | RegexOptions.Compiled,
+            RegexTimeout);
 
         private static readonly Regex DirectSaveRegex = new(
             @"^save_(?<faction>.+?)\.sav$",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            RegexOptions.IgnoreCase | RegexOptions.Compiled,
+            RegexTimeout);
 
         private static readonly Regex QuicksaveRegex = new(
             @"^(?:save_)?quicksave(?:\s*[-_].*)?\.sav$",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            RegexOptions.IgnoreCase | RegexOptions.Compiled,
+            RegexTimeout);
 
         public CampaignSaveInfo ParseSaveFile(string filePath)
         {
@@ -74,7 +80,7 @@ namespace RRM_SM.Services
                 }
 
                 // If details contains a number (e.g. Turn 101 or 101 or Turn 101 Battle or 101_2026-...)
-                var turnMatch = Regex.Match(details, @"^(?:turn\s*)?(?<turn>\d+)(?:[\s_-].*)?$", RegexOptions.IgnoreCase);
+                var turnMatch = Regex.Match(details, @"^(?:turn\s*)?(?<turn>\d+)(?:[\s_-].*)?$", RegexOptions.IgnoreCase, RegexTimeout);
                 if (turnMatch.Success && int.TryParse(turnMatch.Groups["turn"].Value, out int turn))
                 {
                     saveInfo.Turn = turn;
@@ -246,7 +252,7 @@ namespace RRM_SM.Services
             }
 
             // Collapse multiple spaces into single space
-            cleaned = Regex.Replace(cleaned, @"\s+", " ");
+            cleaned = Regex.Replace(cleaned, @"\s+", " ", RegexOptions.None, RegexTimeout);
 
             cleaned = cleaned.Trim(' ', '.', '-');
 

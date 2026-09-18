@@ -65,7 +65,9 @@ namespace RRM_SM.Services
                     Directory.CreateDirectory(dir);
                 }
                 string json = JsonSerializer.Serialize(config, JsonOptions);
-                File.WriteAllText(_configFilePath, json);
+                string tempPath = _configFilePath + ".tmp";
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, _configFilePath, overwrite: true);
             }
             catch (Exception)
             {
