@@ -1,11 +1,28 @@
 <Window x:Class="RRM_SM.UI.Views.InputDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Input"
-        Width="420" Height="200"
+        Title="Backup Name"
+        Width="440" Height="210"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="#1E1E2E">
+        Background="#1E1E2E"
+        FocusManager.FocusedElement="{Binding ElementName=InputTextBox}">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="AccentGold" Color="#C9A84C"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#5E5E7E"/>
+
+        <Style x:Key="AccessibleFocusVisual">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Rectangle Stroke="#FFD700" StrokeThickness="2" StrokeDashArray="2 2"
+                                   SnapsToDevicePixels="True" Margin="-2"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -16,21 +33,27 @@
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" x:Name="MessageText"
-                   Foreground="#E0E0F0" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                   Foreground="#FFFFFF" FontSize="13.5" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,12"/>
 
         <TextBox Grid.Row="1" x:Name="InputTextBox"
-                 Background="#22223A" Foreground="#E0E0F0"
-                 BorderBrush="#3E3E5E" Padding="8,6" FontSize="13"
-                 VerticalContentAlignment="Center"/>
+                 Background="#25253E" Foreground="#FFFFFF"
+                 BorderBrush="#5E5E7E" BorderThickness="1" Padding="8,6" FontSize="13"
+                 VerticalContentAlignment="Center"
+                 FocusVisualStyle="{StaticResource AccessibleFocusVisual}"
+                 AutomationProperties.Name="Backup Name Input"
+                 AutomationProperties.HelpText="Enter a label for the backup snapshot"/>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
-            <Button Content="OK" Width="80" Padding="0,6" Margin="0,0,8,0"
+            <Button Content="_OK" Width="85" Padding="0,7" Margin="0,0,10,0"
                     Background="#5A4A20" Foreground="#C9A84C" BorderBrush="#C9A84C" BorderThickness="1"
-                    Click="OkButton_Click" IsDefault="True"/>
-            <Button Content="Cancel" Width="80" Padding="0,6"
-                    Background="#3E3E5E" Foreground="#E0E0F0" BorderBrush="#5E5E7E" BorderThickness="1"
-                    Click="CancelButton_Click" IsCancel="True"/>
+                    Click="OkButton_Click" IsDefault="True" Cursor="Hand"
+                    FocusVisualStyle="{StaticResource AccessibleFocusVisual}"
+                    AutomationProperties.Name="Confirm Backup Name (Alt+O or Enter)"/>
+            <Button Content="_Cancel" Width="85" Padding="0,7"
+                    Background="#3E3E5E" Foreground="#FFFFFF" BorderBrush="#5E5E7E" BorderThickness="1"
+                    Click="CancelButton_Click" IsCancel="True" Cursor="Hand"
+                    FocusVisualStyle="{StaticResource AccessibleFocusVisual}"
+                    AutomationProperties.Name="Cancel Backup (Alt+C or Esc)"/>
         </StackPanel>
     </Grid>
 </Window>
-

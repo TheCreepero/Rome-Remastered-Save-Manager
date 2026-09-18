@@ -498,11 +498,11 @@ namespace RRM_SM
                             : _backupService.GetMostRecentCampaign();
 
                         var entry = _backupService.CreateCampaignBackup(target, customName);
-                        Console.WriteLine($"Backup successful: [{entry.CampaignName}] {entry.Name} ({entry.FormattedSize}, {entry.FileCount} files)");
+                        Console.WriteLine($"✔ [OK] Backup successful: [{entry.CampaignName}] {entry.Name} ({entry.FormattedSize}, {entry.FileCount} files)");
                     }
                     catch (Exception ex)
                     {
-                        Console.Error.WriteLine($"Backup error: {ex.Message}");
+                        Console.Error.WriteLine($"✖ [ERROR] Backup error: {ex.Message}");
                         Environment.ExitCode = 1;
                     }
                     break;
@@ -512,7 +512,7 @@ namespace RRM_SM
                     try
                     {
                         var entries = _backupService.CreateAllCampaignsBackup(allTag);
-                        Console.WriteLine($"Successfully backed up {entries.Count} campaign(s):");
+                        Console.WriteLine($"✔ [OK] Successfully backed up {entries.Count} campaign(s):");
                         foreach (var e in entries)
                         {
                             Console.WriteLine($"  [{e.CampaignName}] -> {e.Name} ({e.FormattedSize})");
@@ -520,7 +520,7 @@ namespace RRM_SM
                     }
                     catch (Exception ex)
                     {
-                        Console.Error.WriteLine($"Backup error: {ex.Message}");
+                        Console.Error.WriteLine($"✖ [ERROR] Backup error: {ex.Message}");
                         Environment.ExitCode = 1;
                     }
                     break;
@@ -576,8 +576,43 @@ namespace RRM_SM
 
         private static void PrintColored(string message, ConsoleColor color)
         {
+            string prefix = "";
+            string cleanMessage = message;
+
+            if (cleanMessage.StartsWith("✔ "))
+            {
+                prefix = "✔ [OK] ";
+                cleanMessage = cleanMessage.Substring(2);
+            }
+            else if (cleanMessage.StartsWith("✖ "))
+            {
+                prefix = "✖ [ERROR] ";
+                cleanMessage = cleanMessage.Substring(2);
+            }
+            else if (cleanMessage.StartsWith("--> "))
+            {
+                prefix = "ℹ [INFO] ";
+                cleanMessage = cleanMessage.Substring(4);
+            }
+            else if (color == ConsoleColor.Green || color == ConsoleColor.DarkGreen)
+            {
+                prefix = "✔ [OK] ";
+            }
+            else if (color == ConsoleColor.Red)
+            {
+                prefix = "✖ [ERROR] ";
+            }
+            else if (color == ConsoleColor.Yellow)
+            {
+                prefix = "⚠ [WARN] ";
+            }
+            else if (color == ConsoleColor.Cyan)
+            {
+                prefix = "ℹ [INFO] ";
+            }
+
             Console.ForegroundColor = color;
-            Console.WriteLine(message);
+            Console.WriteLine($"{prefix}{cleanMessage}");
             Console.ResetColor();
         }
 

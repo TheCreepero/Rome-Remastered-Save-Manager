@@ -11,7 +11,11 @@ namespace RRM_SM.UI.Views
             InitializeComponent();
             Title = title;
             MessageText.Text = message;
-            InputTextBox.Focus();
+            Loaded += (s, e) =>
+            {
+                InputTextBox.Focus();
+                InputTextBox.SelectAll();
+            };
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -27,4 +31,3 @@ namespace RRM_SM.UI.Views
         }
     }
 }
-
