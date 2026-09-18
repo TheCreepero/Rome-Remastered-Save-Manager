@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
 using RRM_SM.UI.ViewModels;
@@ -53,6 +54,59 @@ namespace RRM_SM.UI.Views
             {
                 vm.RestoreCommand.Execute(null);
                 e.Handled = true;
+            }
+        }
+
+        private void DataGridRow_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is DataGridRow row)
+            {
+                row.IsSelected = true;
+                row.Focus();
+            }
+        }
+
+        private void ContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                bool hasSelection = vm.SelectedBackup != null && !vm.IsBusy;
+                MenuRestore.IsEnabled = hasSelection;
+                MenuOpenExplorer.IsEnabled = vm.SelectedBackup != null;
+                MenuCopyPath.IsEnabled = vm.SelectedBackup != null;
+                MenuDelete.IsEnabled = hasSelection;
+            }
+        }
+
+        private void ContextMenu_Restore_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.RestoreCommand.CanExecute(null))
+            {
+                vm.RestoreCommand.Execute(null);
+            }
+        }
+
+        private void ContextMenu_OpenExplorer_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.OpenSelectedInExplorerCommand.CanExecute(null))
+            {
+                vm.OpenSelectedInExplorerCommand.Execute(null);
+            }
+        }
+
+        private void ContextMenu_CopyPath_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.CopyBackupPathCommand.CanExecute(null))
+            {
+                vm.CopyBackupPathCommand.Execute(null);
+            }
+        }
+
+        private void ContextMenu_Delete_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm && vm.DeleteBackupCommand.CanExecute(null))
+            {
+                vm.DeleteBackupCommand.Execute(null);
             }
         }
 

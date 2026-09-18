@@ -502,21 +502,21 @@
                                         </Style>
                                     </DataGrid.CellStyle>
 
+                                    <DataGrid.ContextMenu>
+                                        <ContextMenu Background="#25253E" BorderBrush="{StaticResource ControlBorder}" Opened="ContextMenu_Opened">
+                                            <MenuItem x:Name="MenuRestore" Header="↩ Restore Selected Backup..." Click="ContextMenu_Restore_Click" Foreground="#FFFFFF"/>
+                                            <MenuItem x:Name="MenuOpenExplorer" Header="📂 Reveal in File Explorer" Click="ContextMenu_OpenExplorer_Click" Foreground="#FFFFFF"/>
+                                            <MenuItem x:Name="MenuCopyPath" Header="📋 Copy Full Path" Click="ContextMenu_CopyPath_Click" Foreground="#FFFFFF"/>
+                                            <Separator Background="{StaticResource BorderBrush}"/>
+                                            <MenuItem x:Name="MenuDelete" Header="🗑 Delete Backup..." Click="ContextMenu_Delete_Click" Foreground="{StaticResource AccentRed}"/>
+                                        </ContextMenu>
+                                    </DataGrid.ContextMenu>
+
                                     <DataGrid.RowStyle>
                                         <Style TargetType="DataGridRow">
                                             <Setter Property="FocusVisualStyle" Value="{StaticResource AccessibleFocusVisual}"/>
                                             <EventSetter Event="MouseDoubleClick" Handler="DataGridRow_MouseDoubleClick"/>
-                                            <Setter Property="ContextMenu">
-                                                <Setter.Value>
-                                                    <ContextMenu Background="#25253E" BorderBrush="{StaticResource ControlBorder}">
-                                                        <MenuItem Header="↩ Restore Selected Backup..." Command="{Binding DataContext.RestoreCommand, RelativeSource={RelativeSource AncestorType=Window}}" Foreground="#FFFFFF"/>
-                                                        <MenuItem Header="📂 Reveal in File Explorer" Command="{Binding DataContext.OpenSelectedInExplorerCommand, RelativeSource={RelativeSource AncestorType=Window}}" Foreground="#FFFFFF"/>
-                                                        <MenuItem Header="📋 Copy Full Path" Command="{Binding DataContext.CopyBackupPathCommand, RelativeSource={RelativeSource AncestorType=Window}}" Foreground="#FFFFFF"/>
-                                                        <Separator Background="{StaticResource BorderBrush}"/>
-                                                        <MenuItem Header="🗑 Delete Backup..." Command="{Binding DataContext.DeleteBackupCommand, RelativeSource={RelativeSource AncestorType=Window}}" Foreground="{StaticResource AccentRed}"/>
-                                                    </ContextMenu>
-                                                </Setter.Value>
-                                            </Setter>
+                                            <EventSetter Event="PreviewMouseRightButtonDown" Handler="DataGridRow_PreviewMouseRightButtonDown"/>
                                             <Style.Triggers>
                                                 <Trigger Property="IsSelected" Value="True">
                                                     <Setter Property="Background" Value="#404068"/>
