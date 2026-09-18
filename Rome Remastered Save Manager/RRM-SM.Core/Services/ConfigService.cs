@@ -44,11 +44,9 @@ namespace RRM_SM.Services
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"Warning reading configuration file: {ex.Message}. Initializing defaults.");
-                Console.ResetColor();
+                // Silently fallback to defaults in library context
             }
 
             var newConfig = new AppConfig();
@@ -61,14 +59,17 @@ namespace RRM_SM.Services
         {
             try
             {
+                string? dir = Path.GetDirectoryName(_configFilePath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
                 string json = JsonSerializer.Serialize(config, JsonOptions);
                 File.WriteAllText(_configFilePath, json);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Failed to save configuration: {ex.Message}");
-                Console.ResetColor();
+                // Silently swallow in library context; callers can handle via try/catch
             }
         }
 
@@ -93,7 +94,7 @@ namespace RRM_SM.Services
         public static string? AutoDetectRomeSaveDirectory()
         {
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            
+
             // 1. Rome Remastered standard local path:
             string feralRome = Path.Combine(localAppData, "Feral Interactive", "Total War ROME REMASTERED", "VFS", "Local", "Rome", "saves");
             if (Directory.Exists(feralRome))

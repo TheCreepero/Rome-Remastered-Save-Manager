@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RRM-SM\RRM-SM.csproj" />
+    <ProjectReference Include="..\RRM-SM.Core\RRM-SM.Core.csproj" />
   </ItemGroup>
 
 </Project>

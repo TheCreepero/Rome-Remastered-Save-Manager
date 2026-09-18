@@ -1,6 +1,6 @@
 # Total War: ROME REMASTERED - Save Manager
 
-A lightweight, robust Save Manager and Backup utility for **Total War: ROME REMASTERED** (.NET 8).
+A robust Save Manager and Backup utility for **Total War: ROME REMASTERED** (.NET 8), available as both a **Desktop GUI** (WPF) and a **CLI tool**.
 
 ## Features
 
@@ -9,38 +9,31 @@ A lightweight, robust Save Manager and Backup utility for **Total War: ROME REMA
 - **Full Restore with Safety Net**: Restore any previous snapshot directly into the game folder. Creates an automatic safety backup before overwriting active saves.
 - **Compression**: Toggle between folder snapshots or `.zip` archives.
 - **Retention Management**: Set maximum snapshots to keep (or unlimited).
-- **Direct Explorer Integration**: Open active saves and backup folders in File Explorer with one key.
-- **CLI & Scripting Support**: Run unattended backups via flags (e.g., in scheduled tasks or desktop shortcuts).
+- **Direct Explorer Integration**: Open active saves and backup folders in File Explorer.
+- **CLI & Scripting Support**: Run unattended backups via flags (e.g., in scheduled tasks).
 
 ---
 
-## Interactive Menu Options
+## Running the Application
 
-Launch `RRM-SM.exe` or `dotnet run` to open the interactive console UI:
+### Desktop GUI (Recommended)
 
-```
-================================================================================
-           TOTAL WAR: ROME REMASTERED - SAVE MANAGER & BACKUP TOOL              
-================================================================================
-  Game Save Folder : ...\AppData\Local\Feral Interactive\...\saves [OK]
-  Backup Directory : ...\Documents\Rome Remastered Backups
-  Mode             : Folder Snapshots | Max Backups: Unlimited
---------------------------------------------------------------------------------
-  [1] Quick Backup (Timestamped snapshot of all active saves)
-  [2] Named Backup (Tag snapshot e.g. 'Turn 50 Before Siege')
-  [3] Restore Backup (Restore a saved state with safety fallback)
-  [4] List All Backups
-  [5] Open Active Saves in File Explorer
-  [6] Open Backup Directory in File Explorer
-  [7] Configuration & Settings
-  [0] Exit
+```bash
+dotnet run --project "Rome Remastered Save Manager/RRM-SM.UI/RRM-SM.UI.csproj"
 ```
 
----
+Or run the compiled executable:
+```
+Rome Remastered Save Manager/RRM-SM.UI/bin/Debug/net8.0-windows/RRM-SM.UI.exe
+```
 
-## Command Line Arguments
+### Interactive CLI
 
-Run non-interactively for automation or batch scripts:
+```bash
+dotnet run --project "Rome Remastered Save Manager/RRM-SM/RRM-SM.csproj"
+```
+
+### CLI Flags (Headless / Scripting)
 
 ```bash
 # Create an immediate quick backup
@@ -60,7 +53,7 @@ RRM-SM --help
 
 ## Configuration (`config.json`)
 
-On first launch, `config.json` is automatically created in the application directory:
+On first launch, `config.json` is automatically created:
 
 ```json
 {
@@ -71,16 +64,24 @@ On first launch, `config.json` is automatically created in the application direc
 }
 ```
 
-- `CompressBackups`: Set to `true` to store backups as `.zip` files.
-- `MaxBackupsToKeep`: `0` preserves all backups indefinitely. Set to `5`, `10`, etc. to keep only the newest N user backups.
+All settings are configurable from both the GUI Settings tab and the CLI Settings menu.
+
+---
+
+## Solution Structure
+
+```
+Rome Remastered Save Manager/
+├── RRM-SM.Core/          # Shared business logic (Models & Services)
+├── RRM-SM.UI/            # WPF Desktop Application
+├── RRM-SM/               # Interactive CLI & scripting entrypoint
+└── RRM-SM.Tests/         # Automated xUnit tests
+```
 
 ---
 
 ## Running Tests
 
-Automated xUnit tests are included in `RRM-SM.Tests`:
-
 ```bash
 dotnet test "Rome Remastered Save Manager/Rome Remastered Save Manager.sln"
 ```
-

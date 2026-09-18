@@ -31,6 +31,8 @@ namespace RRM_SM.Models
                 return $"{TotalSizeBytes} B";
             }
         }
+
+        public string TypeLabel => Type == BackupType.ZipArchive ? ".zip" : "Folder";
     }
 }
 

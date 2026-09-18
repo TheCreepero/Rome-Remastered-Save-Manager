@@ -12,3 +12,8 @@ c:\dev\rome-remastered-save-manager\Rome Remastered Save Manager\RRM-SM\obj\Debu
 c:\dev\rome-remastered-save-manager\Rome Remastered Save Manager\RRM-SM\obj\Debug\net8.0\RRM-SM.pdb
 c:\dev\rome-remastered-save-manager\Rome Remastered Save Manager\RRM-SM\obj\Debug\net8.0\RRM-SM.genruntimeconfig.cache
 c:\dev\rome-remastered-save-manager\Rome Remastered Save Manager\RRM-SM\obj\Debug\net8.0\ref\RRM-SM.dll
+c:\dev\rome-remastered-save-manager\Rome Remastered Save Manager\RRM-SM\bin\Debug\net8.0\RRM-SM.Core.dll
+c:\dev\rome-remastered-save-manager\Rome Remastered Save Manager\RRM-SM\bin\Debug\net8.0\RRM-SM.Core.pdb
+c:\dev\rome-remastered-save-manager\Rome Remastered Save Manager\RRM-SM\obj\Debug\net8.0\RRM-SM.csproj.AssemblyReference.cache
+c:\dev\rome-remastered-save-manager\Rome Remastered Save Manager\RRM-SM\obj\Debug\net8.0\RRM-SM.sourcelink.json
+c:\dev\rome-remastered-save-manager\Rome Remastered Save Manager\RRM-SM\obj\Debug\net8.0\RRM-SM.csproj.Up2Date
