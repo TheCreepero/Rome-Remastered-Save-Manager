@@ -35,7 +35,8 @@ namespace RRM_SM.Services
                 FilePath = filePath,
                 FileName = fileName,
                 LastModified = fileInfo.Exists ? fileInfo.LastWriteTime : DateTime.Now,
-                FileSizeBytes = fileInfo.Exists ? fileInfo.Length : 0
+                FileSizeBytes = fileInfo.Exists ? fileInfo.Length : 0,
+                GameCampaignId = TryReadInternalCampaignGuid(filePath)
             };
 
             // 1. Quicksave check
@@ -106,6 +107,42 @@ namespace RRM_SM.Services
             return saveInfo;
         }
 
+        /// <summary>
+        /// Reads the authoritative 16-byte internal Campaign GUID from bytes 36..51 of a Total War: ROME REMASTERED .sav file header.
+        /// Returns the standard lowercase hyphenated GUID string (e.g. "6ac7cc5e-1378-cbde-8b61-a0844b08a46a"), or null if unavailable.
+        /// </summary>
+        public static string? TryReadInternalCampaignGuid(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return null;
+
+            try
+            {
+                if (!File.Exists(filePath)) return null;
+
+                var fileInfo = new FileInfo(filePath);
+                if (fileInfo.Length < 52) return null;
+
+                using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                byte[] header = new byte[52];
+                int bytesRead = fs.Read(header, 0, 52);
+                if (bytesRead < 52) return null;
+
+                byte[] guidBytes = new byte[16];
+                Buffer.BlockCopy(header, 36, guidBytes, 0, 16);
+                var guid = new Guid(guidBytes);
+                if (guid != Guid.Empty)
+                {
+                    return guid.ToString("D");
+                }
+            }
+            catch
+            {
+                // Non-blocking fallback for inaccessible, locked, or mock test files
+            }
+
+            return null;
+        }
+
         public Dictionary<string, List<CampaignSaveInfo>> GroupSaveFiles(IEnumerable<string> filePaths)
         {
             var parsedList = filePaths
@@ -120,8 +157,20 @@ namespace RRM_SM.Services
                 .ToList();
 
             // Resolve quicksaves and unassigned files
-            foreach (var save in parsedList.Where(s => string.IsNullOrWhiteSpace(s.FactionName)))
+            foreach (var save in parsedList.Where(s => string.IsNullOrWhiteSpace(s.FactionName) || s.FactionName.Equals("General", StringComparison.OrdinalIgnoreCase)))
             {
+                // 1. Primary: Ground-truth match by GameCampaignId if available
+                if (!string.IsNullOrWhiteSpace(save.GameCampaignId))
+                {
+                    var matchingByGuid = resolvedSaves.FirstOrDefault(s => s.GameCampaignId == save.GameCampaignId);
+                    if (matchingByGuid != null && !string.IsNullOrWhiteSpace(matchingByGuid.FactionName))
+                    {
+                        save.FactionName = matchingByGuid.FactionName;
+                        continue;
+                    }
+                }
+
+                // 2. Fallback: Proximity heuristic
                 string? associatedFaction = ResolveAssociatedFaction(save, resolvedSaves);
                 save.FactionName = !string.IsNullOrWhiteSpace(associatedFaction) ? associatedFaction : "General";
             }

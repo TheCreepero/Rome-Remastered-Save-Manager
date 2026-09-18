@@ -20,6 +20,10 @@ namespace RRM_SM.Models
         public SaveFileType Type { get; set; } = SaveFileType.Unknown;
         public DateTime LastModified { get; set; }
         public long FileSizeBytes { get; set; }
+        /// <summary>
+        /// The authoritative 16-byte Campaign GUID extracted directly from the save file header (bytes 36..51), if available.
+        /// </summary>
+        public string? GameCampaignId { get; set; }
     }
 }
 

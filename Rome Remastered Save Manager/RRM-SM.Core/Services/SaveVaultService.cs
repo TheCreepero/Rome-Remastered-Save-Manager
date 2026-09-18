@@ -171,7 +171,8 @@ namespace RRM_SM.Services
                     detectedFaction,
                     saveInfo.Turn,
                     fileInfo.LastWriteTime,
-                    campaignName);
+                    campaignName,
+                    saveInfo.GameCampaignId);
 
                 // 1. De-duplication check: if a save with identical SHA-256 hash already exists in this campaign
                 var existingSameHash = _manifest.Saves.FirstOrDefault(s => 
@@ -224,6 +225,7 @@ namespace RRM_SM.Services
                     Id = Guid.NewGuid().ToString("N"),
                     CampaignId = resolvedCampaignId,
                     Faction = resolvedFaction,
+                    GameCampaignId = saveInfo.GameCampaignId,
                     StoredFileName = storedFileName,
                     OriginalGameFileName = originalGameFileName,
                     CampaignName = resolvedCampaignName,
@@ -649,7 +651,8 @@ namespace RRM_SM.Services
             string detectedFaction,
             int? turn,
             DateTime lastModified,
-            string? explicitCampaignHint = null)
+            string? explicitCampaignHint = null,
+            string? gameCampaignId = null)
         {
             lock (_lock)
             {
@@ -664,6 +667,10 @@ namespace RRM_SM.Services
                     if (_manifest.Campaigns.TryGetValue(explicitCampaignHint, out var exactById))
                     {
                         exactById.LastPlayedAt = lastModified > exactById.LastPlayedAt ? lastModified : exactById.LastPlayedAt;
+                        if (!string.IsNullOrWhiteSpace(gameCampaignId) && string.IsNullOrWhiteSpace(exactById.GameCampaignId))
+                        {
+                            exactById.GameCampaignId = gameCampaignId;
+                        }
                         return (exactById.Id, exactById.DisplayName, exactById.Faction);
                     }
 
@@ -675,12 +682,96 @@ namespace RRM_SM.Services
                         if (exactByName != null)
                         {
                             exactByName.LastPlayedAt = lastModified > exactByName.LastPlayedAt ? lastModified : exactByName.LastPlayedAt;
+                            if (!string.IsNullOrWhiteSpace(gameCampaignId) && string.IsNullOrWhiteSpace(exactByName.GameCampaignId))
+                            {
+                                exactByName.GameCampaignId = gameCampaignId;
+                            }
                             return (exactByName.Id, exactByName.DisplayName, exactByName.Faction);
                         }
                     }
                 }
 
-                // 1. Find candidate campaigns for this faction
+                // PRIORITY 1: Match by authoritative internal GameCampaignId if available
+                if (!string.IsNullOrWhiteSpace(gameCampaignId))
+                {
+                    var matchedCampaign = _manifest.Campaigns.Values.FirstOrDefault(c =>
+                        !string.IsNullOrWhiteSpace(c.GameCampaignId) &&
+                        c.GameCampaignId.Equals(gameCampaignId, StringComparison.OrdinalIgnoreCase));
+
+                    if (matchedCampaign == null)
+                    {
+                        var existingSave = _manifest.Saves.FirstOrDefault(s =>
+                            !string.IsNullOrWhiteSpace(s.GameCampaignId) &&
+                            s.GameCampaignId.Equals(gameCampaignId, StringComparison.OrdinalIgnoreCase));
+
+                        if (existingSave != null && !string.IsNullOrWhiteSpace(existingSave.CampaignId) &&
+                            _manifest.Campaigns.TryGetValue(existingSave.CampaignId, out var campFromSave))
+                        {
+                            matchedCampaign = campFromSave;
+                            matchedCampaign.GameCampaignId = gameCampaignId;
+                        }
+                    }
+
+                    if (matchedCampaign != null)
+                    {
+                        matchedCampaign.LastPlayedAt = lastModified > matchedCampaign.LastPlayedAt ? lastModified : matchedCampaign.LastPlayedAt;
+                        return (matchedCampaign.Id, matchedCampaign.DisplayName, matchedCampaign.Faction);
+                    }
+
+                    // GameCampaignId is present and distinct from all known campaigns -> Definitively a new playthrough!
+                    var otherCampaigns = _manifest.Campaigns.Values
+                        .Where(c => c.Faction.Equals(detectedFaction, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+                    string newCampId = Guid.NewGuid().ToString("N");
+                    string newDisplayName;
+
+                    if (otherCampaigns.Count > 0)
+                    {
+                        foreach (var existing in otherCampaigns)
+                        {
+                            if (!existing.IsCustomNamed && existing.DisplayName.Equals(detectedFaction, StringComparison.OrdinalIgnoreCase))
+                            {
+                                bool sameMonth = existing.CreatedAt.ToString("yyyy-MM").Equals(lastModified.ToString("yyyy-MM"), StringComparison.OrdinalIgnoreCase);
+                                string disambiguated = sameMonth
+                                    ? $"{detectedFaction} ({existing.CreatedAt:yyyy-MM-dd})"
+                                    : $"{detectedFaction} ({existing.CreatedAt:MMM yyyy})";
+
+                                existing.DisplayName = disambiguated;
+                                foreach (var s in _manifest.Saves.Where(s => s.CampaignId == existing.Id))
+                                {
+                                    s.CampaignName = disambiguated;
+                                }
+                            }
+                        }
+
+                        newDisplayName = $"{detectedFaction} ({lastModified:MMM yyyy})";
+                        if (_manifest.Campaigns.Values.Any(c => c.DisplayName.Equals(newDisplayName, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            newDisplayName = $"{detectedFaction} ({lastModified:yyyy-MM-dd})";
+                        }
+                    }
+                    else
+                    {
+                        newDisplayName = detectedFaction;
+                    }
+
+                    var newMeta = new CampaignMetadata
+                    {
+                        Id = newCampId,
+                        Faction = detectedFaction,
+                        DisplayName = newDisplayName,
+                        IsCustomNamed = false,
+                        CreatedAt = lastModified,
+                        LastPlayedAt = lastModified,
+                        GameCampaignId = gameCampaignId
+                    };
+
+                    _manifest.Campaigns[newCampId] = newMeta;
+                    return (newCampId, newDisplayName, detectedFaction);
+                }
+
+                // PRIORITY 2: Fallback heuristic clustering (14-day gap, 50-turn discontinuity)
                 var candidates = _manifest.Campaigns.Values
                     .Where(c => c.Faction.Equals(detectedFaction, StringComparison.OrdinalIgnoreCase))
                     .ToList();
@@ -735,7 +826,7 @@ namespace RRM_SM.Services
                     return (bestCandidate.Id, bestCandidate.DisplayName, bestCandidate.Faction);
                 }
 
-                // 2. Need to create a new campaign
+                // 2. Need to create a new campaign (via heuristic)
                 string newId = Guid.NewGuid().ToString("N");
                 string displayName;
 
@@ -777,7 +868,8 @@ namespace RRM_SM.Services
                     DisplayName = displayName,
                     IsCustomNamed = false,
                     CreatedAt = lastModified,
-                    LastPlayedAt = lastModified
+                    LastPlayedAt = lastModified,
+                    GameCampaignId = gameCampaignId
                 };
 
                 _manifest.Campaigns[newId] = metadata;
@@ -808,7 +900,7 @@ namespace RRM_SM.Services
                 return;
             }
 
-            // 1. Re-parse original game filename for each save to get accurate faction and turn
+            // 1. Re-parse original game filename for each save to get accurate faction and turn, and backfill GameCampaignId
             foreach (var save in _manifest.Saves)
             {
                 string parseTarget = !string.IsNullOrWhiteSpace(save.OriginalGameFileName)
@@ -834,9 +926,20 @@ namespace RRM_SM.Services
                 {
                     save.SaveType = info.Type;
                 }
+
+                // If GameCampaignId is not yet recorded on this save item, try reading from disk
+                if (string.IsNullOrWhiteSpace(save.GameCampaignId))
+                {
+                    string diskPath = Path.Combine(_config.BackupDirectory, save.StoredFileName);
+                    string? guid = CampaignParserService.TryReadInternalCampaignGuid(diskPath);
+                    if (!string.IsNullOrWhiteSpace(guid))
+                    {
+                        save.GameCampaignId = guid;
+                    }
+                }
             }
 
-            // 2. Associate unassigned / quicksaves with nearest resolved save in time (within 48 hours)
+            // 2. Associate unassigned / quicksaves with nearest resolved save or via GameCampaignId
             var resolvedSaves = _manifest.Saves
                 .Where(s => !string.IsNullOrWhiteSpace(s.Faction) && !s.Faction.Equals("General", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(s => s.LastModified)
@@ -844,6 +947,16 @@ namespace RRM_SM.Services
 
             foreach (var save in _manifest.Saves.Where(s => string.IsNullOrWhiteSpace(s.Faction) || s.Faction.Equals("General", StringComparison.OrdinalIgnoreCase)))
             {
+                if (!string.IsNullOrWhiteSpace(save.GameCampaignId))
+                {
+                    var matchByGuid = resolvedSaves.FirstOrDefault(r => r.GameCampaignId == save.GameCampaignId);
+                    if (matchByGuid != null)
+                    {
+                        save.Faction = matchByGuid.Faction;
+                        continue;
+                    }
+                }
+
                 var closest = resolvedSaves
                     .Select(r => new { Save = r, Diff = Math.Abs((r.LastModified - save.LastModified).TotalHours) })
                     .Where(x => x.Diff <= 48.0)
@@ -867,7 +980,7 @@ namespace RRM_SM.Services
 
             var newCampaigns = new Dictionary<string, CampaignMetadata>();
 
-            // 4. Cluster saves per faction (14 days temporal gap, 50 turns turn continuity)
+            // 4. Cluster saves per faction (Ground-truth GameCampaignId first, then 14 days / 50 turns fallback)
             var factionGroups = _manifest.Saves
                 .GroupBy(s => s.Faction ?? "General", StringComparer.OrdinalIgnoreCase)
                 .OrderBy(g => g.Key);
@@ -877,7 +990,29 @@ namespace RRM_SM.Services
                 string faction = group.Key;
                 var sortedSaves = group.OrderBy(s => s.LastModified).ToList();
 
-                var clusters = ClusterSaves(sortedSaves, maxDayGap: 14.0, maxTurnGap: 50);
+                var clusters = new List<SaveCluster>();
+
+                // A. Group saves that have an authoritative GameCampaignId
+                var guidGroups = sortedSaves.Where(s => !string.IsNullOrWhiteSpace(s.GameCampaignId))
+                    .GroupBy(s => s.GameCampaignId!, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var gg in guidGroups)
+                {
+                    var sc = new SaveCluster();
+                    sc.Saves.AddRange(gg);
+                    clusters.Add(sc);
+                }
+
+                // B. Cluster remaining saves without GameCampaignId using heuristics (14-day gap, 50-turn discontinuity)
+                var withoutGuid = sortedSaves.Where(s => string.IsNullOrWhiteSpace(s.GameCampaignId)).ToList();
+                if (withoutGuid.Count > 0)
+                {
+                    clusters.AddRange(ClusterSaves(withoutGuid, maxDayGap: 14.0, maxTurnGap: 50));
+                }
+
+                // Sort clusters chronologically by their earliest save
+                clusters = clusters.OrderBy(c => c.Saves.Min(s => s.LastModified)).ToList();
+
                 bool needsDisambiguation = clusters.Count > 1;
 
                 foreach (var cluster in clusters)
@@ -885,6 +1020,7 @@ namespace RRM_SM.Services
                     var clusterSaves = cluster.Saves;
                     DateTime earliest = clusterSaves.Min(s => s.LastModified);
                     DateTime latest = clusterSaves.Max(s => s.LastModified);
+                    string? clusterGuid = clusterSaves.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.GameCampaignId))?.GameCampaignId;
 
                     // Check if saves in this cluster belonged to an existing custom campaign
                     var existingCustom = customCampaigns.FirstOrDefault(c =>
@@ -920,7 +1056,8 @@ namespace RRM_SM.Services
                         DisplayName = displayName,
                         IsCustomNamed = existingCustom?.IsCustomNamed ?? false,
                         CreatedAt = earliest,
-                        LastPlayedAt = latest
+                        LastPlayedAt = latest,
+                        GameCampaignId = clusterGuid
                     };
 
                     newCampaigns[campaignId] = meta;
@@ -930,6 +1067,10 @@ namespace RRM_SM.Services
                         s.CampaignId = campaignId;
                         s.CampaignName = displayName;
                         s.Faction = faction;
+                        if (string.IsNullOrWhiteSpace(s.GameCampaignId) && !string.IsNullOrWhiteSpace(clusterGuid))
+                        {
+                            s.GameCampaignId = clusterGuid;
+                        }
                     }
                 }
             }

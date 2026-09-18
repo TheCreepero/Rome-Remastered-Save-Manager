@@ -112,11 +112,13 @@ The Save Manager uses these patterns to group your saves automatically.
 What if you play multiple separate playthroughs with the same faction over months or years?
 For example, a long 500-turn Byzantium campaign started in 2025, and a fresh Byzantium campaign started in late 2026.
 
-Previously, both playthroughs would be lumped into a single generic "Byzantium" bucket, causing turn numbers to scramble and risk rolling backup pruning deleting saves from your older campaign.
+Previously, both playthroughs would be lumped into a single generic "Byzantium" bucket, causing turn numbers to scramble and risking that rolling backup pruning deletes saves from your older campaign.
 
-The Save Manager now features **heuristic campaign clustering**:
-- **Temporal Gap Threshold (14 Days)**: If a save for the same faction occurs more than 14 days after the previous save session, it is recognized as a distinct campaign cluster.
-- **Turn Continuity Discontinuity (50 Turns)**: Even if played within days, a dramatic turn jump (e.g. Turn 480 followed by Turn 1) immediately identifies a fresh playthrough.
+The Save Manager now features **deterministic ground-truth separation with heuristic fallbacks**:
+- **Authoritative Binary Campaign GUID (Ground Truth)**: Total War: ROME REMASTERED generates a unique 16-byte Campaign GUID in every save file header (bytes 36..51). The Save Manager directly reads this GUID upon scanning any `.sav` file. Saves sharing the same internal GUID are 100% guaranteed to be linked to that exact playthrough — even across quicksaves, manual renames, or years between play sessions!
+- **Heuristic Campaign Clustering (Fallback)**: For saves where the header cannot be read or is unavailable:
+  - **Temporal Gap Threshold (14 Days)**: If a save for the same faction occurs more than 14 days after the previous save session, it is recognized as a distinct campaign cluster.
+  - **Turn Continuity Discontinuity (50 Turns)**: Even if played within days, a dramatic turn jump (e.g. Turn 480 followed by Turn 1) immediately identifies a fresh playthrough.
 - **Automatic Disambiguation**: When multiple campaigns exist for a single faction, the manager automatically gives them clear, timestamped names (e.g. `Byzantium (Feb 2025)` and `Byzantium (Sep 2026)`). If only one campaign exists for a faction, it keeps the clean faction title (e.g. `Kingdom of Macedon`).
 - **Independent Retention Pools**: Backup pruning rules apply to each campaign playthrough independently. Starting a new campaign will **never** cause your beloved completed playthroughs to be deleted!
 

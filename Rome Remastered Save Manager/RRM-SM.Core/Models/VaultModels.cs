@@ -18,6 +18,11 @@ namespace RRM_SM.Models
         public bool IsCustomNamed { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime LastPlayedAt { get; set; } = DateTime.Now;
+
+        /// <summary>
+        /// The authoritative internal Campaign GUID extracted from the save file headers (bytes 36..51).
+        /// </summary>
+        public string? GameCampaignId { get; set; }
     }
 
     public class VaultSaveItem
@@ -25,6 +30,11 @@ namespace RRM_SM.Models
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string? CampaignId { get; set; }
         public string? Faction { get; set; }
+
+        /// <summary>
+        /// Authoritative 16-byte internal Campaign GUID from the save file header.
+        /// </summary>
+        public string? GameCampaignId { get; set; }
         
         /// <summary>
         /// Actual file name residing flat in the backup vault directory (e.g. save_Quicksave_2026-09-19_00-15-00.sav)

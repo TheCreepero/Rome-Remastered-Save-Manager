@@ -428,5 +428,118 @@ namespace RRM_SM.Tests
             Assert.Equal("Achaean League", reloaded.CampaignName);
             Assert.Equal(3, reloaded.Turn);
         }
+
+        private static void CreateMockSaveWithGuid(string filePath, Guid campaignGuid, string extraContent = "")
+        {
+            byte[] buffer = new byte[128];
+            buffer[0] = 0x0A; buffer[1] = 0x07; buffer[2] = 0x00; buffer[3] = 0x00;
+            byte[] guidBytes = campaignGuid.ToByteArray();
+            Buffer.BlockCopy(guidBytes, 0, buffer, 36, 16);
+
+            if (!string.IsNullOrEmpty(extraContent))
+            {
+                byte[] extraBytes = System.Text.Encoding.UTF8.GetBytes(extraContent);
+                Array.Resize(ref buffer, buffer.Length + extraBytes.Length);
+                Buffer.BlockCopy(extraBytes, 0, buffer, 128, extraBytes.Length);
+            }
+
+            File.WriteAllBytes(filePath, buffer);
+        }
+
+        [Fact]
+        public void TryReadInternalCampaignGuid_ValidHeader_ExtractsGuidCorrectly()
+        {
+            var expectedGuid = Guid.NewGuid();
+            string testFile = Path.Combine(_gameSaveDir, "test_guid_header.sav");
+            CreateMockSaveWithGuid(testFile, expectedGuid, "Save content data");
+
+            string? extracted = CampaignParserService.TryReadInternalCampaignGuid(testFile);
+            Assert.NotNull(extracted);
+            Assert.Equal(expectedGuid.ToString("D"), extracted);
+        }
+
+        [Fact]
+        public void TryReadInternalCampaignGuid_InvalidOrShortFile_ReturnsNullSafely()
+        {
+            string shortFile = Path.Combine(_gameSaveDir, "short.sav");
+            File.WriteAllBytes(shortFile, new byte[] { 1, 2, 3, 4 });
+
+            string? result = CampaignParserService.TryReadInternalCampaignGuid(shortFile);
+            Assert.Null(result);
+
+            string? nonExistent = CampaignParserService.TryReadInternalCampaignGuid(Path.Combine(_gameSaveDir, "missing.sav"));
+            Assert.Null(nonExistent);
+        }
+
+        [Fact]
+        public void DeterministicCampaignSeparation_SameFactionAndDate_DifferentGameCampaignId_CreatesDistinctCampaigns()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+
+            var guid1 = Guid.NewGuid();
+            var guid2 = Guid.NewGuid();
+
+            // Playthrough 1: Byzantium Turn 10
+            string save1 = Path.Combine(_gameSaveDir, "save_Autosave   Byzantium   Turn 10.sav");
+            CreateMockSaveWithGuid(save1, guid1);
+            File.SetLastWriteTime(save1, new DateTime(2026, 9, 18, 10, 0, 0));
+            var item1 = vault.AddSaveFile(save1, "Byzantium");
+
+            // Playthrough 2: Byzantium Turn 10 (same turn, same hour!), but different game campaign GUID
+            string save2 = Path.Combine(_gameSaveDir, "save_Autosave   Byzantium   Turn 10 Start.sav");
+            CreateMockSaveWithGuid(save2, guid2);
+            File.SetLastWriteTime(save2, new DateTime(2026, 9, 18, 10, 30, 0));
+            var item2 = vault.AddSaveFile(save2, "Byzantium");
+
+            // Must be definitively separated by GameCampaignId!
+            Assert.NotEqual(item1.CampaignId, item2.CampaignId);
+            Assert.Equal(guid1.ToString("D"), item1.GameCampaignId);
+            Assert.Equal(guid2.ToString("D"), item2.GameCampaignId);
+        }
+
+        [Fact]
+        public void DeterministicCampaignSeparation_SameGameCampaignId_MatchesExactSameCampaign()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+            var playthroughGuid = Guid.NewGuid();
+
+            // Save 1: Turn 1
+            string save1 = Path.Combine(_gameSaveDir, "save_Autosave   Rome   Turn 1.sav");
+            CreateMockSaveWithGuid(save1, playthroughGuid);
+            File.SetLastWriteTime(save1, new DateTime(2025, 1, 1));
+            var item1 = vault.AddSaveFile(save1, "Rome");
+
+            // Save 2: Turn 150 played 6 months later (exceeding 14-day gap and 50 turns)
+            // But having the exact same GameCampaignId from the save header
+            string save2 = Path.Combine(_gameSaveDir, "save_Autosave   Rome   Turn 150.sav");
+            CreateMockSaveWithGuid(save2, playthroughGuid);
+            File.SetLastWriteTime(save2, new DateTime(2025, 7, 1));
+            var item2 = vault.AddSaveFile(save2, "Rome");
+
+            // GameCampaignId ground truth unites them despite heuristic thresholds!
+            Assert.Equal(item1.CampaignId, item2.CampaignId);
+            Assert.Equal(playthroughGuid.ToString("D"), item2.GameCampaignId);
+        }
+
+        [Fact]
+        public void DeterministicQuicksaveRouting_QuicksaveWithGameCampaignId_RoutesToExactCampaign()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+            var macedonGuid = Guid.NewGuid();
+
+            // Active campaign: Macedon
+            string campSave = Path.Combine(_gameSaveDir, "save_Autosave   Kingdom of Macedon   Turn 40.sav");
+            CreateMockSaveWithGuid(campSave, macedonGuid);
+            var campItem = vault.AddSaveFile(campSave, "Kingdom of Macedon");
+
+            // Quicksave with NO faction in the name, but matching Macedon's header GUID
+            string quicksave = Path.Combine(_gameSaveDir, "save_Quicksave.sav");
+            CreateMockSaveWithGuid(quicksave, macedonGuid);
+            var quickItem = vault.AddSaveFile(quicksave);
+
+            Assert.Equal(campItem.CampaignId, quickItem.CampaignId);
+            Assert.Equal("Kingdom of Macedon", quickItem.Faction);
+            Assert.Equal(campItem.CampaignName, quickItem.CampaignName);
+        }
     }
 }
