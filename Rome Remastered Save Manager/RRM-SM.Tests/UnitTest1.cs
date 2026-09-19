@@ -306,5 +306,40 @@ namespace RRM_SM.Tests
             Assert.DoesNotContain("|", sanitized);
             Assert.Equal("Turn50Siege BeforeWar", sanitized);
         }
+
+        [Fact]
+        public void Readme_ContainsNoEmojis()
+        {
+            // Locate README.md by walking up from AppContext.BaseDirectory
+            string? dir = AppContext.BaseDirectory;
+            string? readmePath = null;
+            while (!string.IsNullOrEmpty(dir))
+            {
+                string candidate = Path.Combine(dir, "README.md");
+                if (File.Exists(candidate))
+                {
+                    readmePath = candidate;
+                    break;
+                }
+                dir = Directory.GetParent(dir)?.FullName;
+            }
+
+            Assert.True(!string.IsNullOrEmpty(readmePath) && File.Exists(readmePath), "README.md could not be found by traversing ancestor directories.");
+
+            string content = File.ReadAllText(readmePath);
+
+            // Regex covering standard unicode emojis:
+            // High/Low Surrogate pairs: \uD83C[\uDF00-\uDFFF] | \uD83D[\uDC00-\uDFFF] | \uD83E[\uDD00-\uDFFF] etc. (astral planes)
+            // Miscellaneous Symbols & Dingbats: \u2600-\u27BF
+            // Misc Symbols and Arrows: \u2B50-\u2B55
+            // Misc Technical: \u2300-\u23FF
+            // Geometric / enclosed / punctuation symbols often used as emojis: \u203C, \u2049, \u2122, \u2139, \u2194-\u2199, \u21A9-\u21AA, \u25AA-\u25AB, \u25B6, \u25C0, \u25FB-\u25FE
+            var emojiRegex = new System.Text.RegularExpressions.Regex(
+                @"[\uD83C-\uDBFF\uDC00-\uDFFF]|[\u2600-\u27BF]|[\u2300-\u23FF]|[\u2B50-\u2B55]|[\u203C\u2049\u2122\u2139\u2194-\u2199\u21A9-\u21AA\u25AA-\u25AB\u25B6\u25C0\u25FB-\u25FE]",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+
+            var matches = emojiRegex.Matches(content);
+            Assert.True(matches.Count == 0, $"README.md contains {matches.Count} emoji(s): " + string.Join(", ", matches.Select(m => $"{m.Value} (U+{(m.Value.Length == 1 ? ((int)m.Value[0]).ToString("X4") : char.ConvertToUtf32(m.Value, 0).ToString("X"))})")));
+        }
     }
 }
