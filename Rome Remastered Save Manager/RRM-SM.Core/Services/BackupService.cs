@@ -30,7 +30,100 @@ namespace RRM_SM.Services
             }
 
             var saveFiles = Directory.GetFiles(_config.GameSaveDirectory, "*.sav", SearchOption.TopDirectoryOnly);
-            return _parserService.GroupSaveFiles(saveFiles);
+            var parsedList = saveFiles
+                .Where(p => p.EndsWith(".sav", StringComparison.OrdinalIgnoreCase))
+                .Select(_parserService.ParseSaveFile)
+                .ToList();
+
+            // Find all files that already have a resolved faction
+            var resolvedSaves = parsedList
+                .Where(s => !string.IsNullOrWhiteSpace(s.FactionName) && !s.FactionName.Equals("General", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(s => s.LastModified)
+                .ToList();
+
+            // Resolve quicksaves and unassigned files
+            foreach (var save in parsedList.Where(s => string.IsNullOrWhiteSpace(s.FactionName) || s.FactionName.Equals("General", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (!string.IsNullOrWhiteSpace(save.GameCampaignId))
+                {
+                    var matchingByGuid = resolvedSaves.FirstOrDefault(s => s.GameCampaignId == save.GameCampaignId);
+                    if (matchingByGuid != null && !string.IsNullOrWhiteSpace(matchingByGuid.FactionName))
+                    {
+                        save.FactionName = matchingByGuid.FactionName;
+                        continue;
+                    }
+                }
+            }
+
+            // Group saves:
+            // 1. For saves with a GameCampaignId, check if the vault already knows their campaign name
+            var groups = new Dictionary<string, List<CampaignSaveInfo>>(StringComparer.OrdinalIgnoreCase);
+            var guidGroups = parsedList
+                .Where(s => !string.IsNullOrWhiteSpace(s.GameCampaignId))
+                .GroupBy(s => s.GameCampaignId!, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            foreach (var gg in guidGroups)
+            {
+                string guid = gg.Key;
+                var saves = gg.ToList();
+                string faction = saves.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s.FactionName) && !s.FactionName.Equals("General", StringComparison.OrdinalIgnoreCase))?.FactionName ?? "General";
+
+                string campaignKey;
+                var meta = _vaultService.GetCampaignMetadataByGameCampaignId(guid);
+                if (meta != null && !string.IsNullOrWhiteSpace(meta.DisplayName))
+                {
+                    campaignKey = meta.DisplayName;
+                }
+                else
+                {
+                    var manualSave = saves.FirstOrDefault(s => s.Type == SaveFileType.Manual && !string.IsNullOrWhiteSpace(s.FileName));
+                    if (manualSave != null)
+                    {
+                        string manualName = Path.GetFileNameWithoutExtension(manualSave.FileName);
+                        if (manualName.StartsWith("save_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            manualName = manualName.Substring(5).Trim();
+                        }
+                        campaignKey = !string.IsNullOrWhiteSpace(manualName) ? manualName : faction;
+                    }
+                    else
+                    {
+                        campaignKey = faction;
+                    }
+                }
+
+                if (!groups.TryGetValue(campaignKey, out var list))
+                {
+                    list = new List<CampaignSaveInfo>();
+                    groups[campaignKey] = list;
+                }
+                list.AddRange(saves);
+            }
+
+            // 2. For saves without GameCampaignId (legacy saves), group by FactionName
+            var legacySaves = parsedList.Where(s => string.IsNullOrWhiteSpace(s.GameCampaignId)).ToList();
+            if (legacySaves.Count > 0)
+            {
+                var legacyGrouped = _parserService.GroupSaveFiles(legacySaves.Select(s => s.FilePath));
+                foreach (var kvp in legacyGrouped)
+                {
+                    if (!groups.TryGetValue(kvp.Key, out var list))
+                    {
+                        list = new List<CampaignSaveInfo>();
+                        groups[kvp.Key] = list;
+                    }
+                    list.AddRange(kvp.Value);
+                }
+            }
+
+            // If no saves had GUID, fall back directly to parser grouping
+            if (groups.Count == 0 && parsedList.Count > 0)
+            {
+                return _parserService.GroupSaveFiles(saveFiles);
+            }
+
+            return groups;
         }
 
         public string GetMostRecentCampaign()
@@ -70,8 +163,19 @@ namespace RRM_SM.Services
             }
             else
             {
-                var allSaves = Directory.GetFiles(_config.GameSaveDirectory, "*.sav", SearchOption.TopDirectoryOnly);
-                targetSaves = allSaves.Select(_parserService.ParseSaveFile).ToList();
+                var matchingCampaign = activeCampaigns.FirstOrDefault(kvp =>
+                    kvp.Key.StartsWith(campaignName + " ", StringComparison.OrdinalIgnoreCase) ||
+                    kvp.Value.Any(s => s.FactionName.Equals(campaignName, StringComparison.OrdinalIgnoreCase)));
+
+                if (matchingCampaign.Value != null && matchingCampaign.Value.Count > 0)
+                {
+                    targetSaves = matchingCampaign.Value;
+                }
+                else
+                {
+                    var allSaves = Directory.GetFiles(_config.GameSaveDirectory, "*.sav", SearchOption.TopDirectoryOnly);
+                    targetSaves = allSaves.Select(_parserService.ParseSaveFile).ToList();
+                }
             }
 
             var source = isSafetyBackup ? SaveSourceType.SafetyBackup : SaveSourceType.Manual;

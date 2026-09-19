@@ -541,5 +541,186 @@ namespace RRM_SM.Tests
             Assert.Equal("Kingdom of Macedon", quickItem.Faction);
             Assert.Equal(campItem.CampaignName, quickItem.CampaignName);
         }
+
+        [Fact]
+        public void DeterministicCampaignSeparation_ManualSaveWithSpaceSuffix_UnitesWithAutosavesByGuid()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+
+            var guid1 = Guid.NewGuid();
+            var guid2 = Guid.NewGuid();
+
+            // Campaign 1: Pontus initial run
+            string camp1Manual = Path.Combine(_gameSaveDir, "save_Pontus.sav");
+            CreateMockSaveWithGuid(camp1Manual, guid1, "C1 Manual");
+            File.SetLastWriteTime(camp1Manual, new DateTime(2026, 9, 19, 1, 26, 0));
+            var item1 = vault.AddSaveFile(camp1Manual);
+
+            string camp1Auto = Path.Combine(_gameSaveDir, "save_Autosave   Pontus   Turn 1 End.sav");
+            CreateMockSaveWithGuid(camp1Auto, guid1, "C1 Auto");
+            File.SetLastWriteTime(camp1Auto, new DateTime(2026, 9, 19, 1, 26, 30));
+            var item1Auto = vault.AddSaveFile(camp1Auto);
+
+            // Campaign 2: Second Pontus run with manual save containing space suffix "Pontus Second"
+            string camp2Manual = Path.Combine(_gameSaveDir, "save_Pontus Second.sav");
+            CreateMockSaveWithGuid(camp2Manual, guid2, "C2 Manual");
+            File.SetLastWriteTime(camp2Manual, new DateTime(2026, 9, 19, 1, 30, 0));
+            var item2 = vault.AddSaveFile(camp2Manual);
+
+            string camp2Auto = Path.Combine(_gameSaveDir, "save_Autosave   Pontus   Turn 1 End.sav");
+            CreateMockSaveWithGuid(camp2Auto, guid2, "C2 Auto");
+            File.SetLastWriteTime(camp2Auto, new DateTime(2026, 9, 19, 1, 30, 30));
+            var item2Auto = vault.AddSaveFile(camp2Auto);
+
+            // Rebuild campaign assignments
+            vault.RebuildCampaignAssignments();
+
+            var reloadedItem1Manual = vault.GetSaveById(item1.Id);
+            var reloadedItem1Auto = vault.GetSaveById(item1Auto.Id);
+            var reloadedItem2Manual = vault.GetSaveById(item2.Id);
+            var reloadedItem2Auto = vault.GetSaveById(item2Auto.Id);
+
+            Assert.NotNull(reloadedItem1Manual);
+            Assert.NotNull(reloadedItem1Auto);
+            Assert.NotNull(reloadedItem2Manual);
+            Assert.NotNull(reloadedItem2Auto);
+
+            // Campaign 1 saves must belong to the exact same CampaignId
+            Assert.Equal(reloadedItem1Manual.CampaignId, reloadedItem1Auto.CampaignId);
+            Assert.Equal("Pontus", reloadedItem1Manual.Faction);
+
+            // Campaign 2 saves must belong to the exact same CampaignId
+            Assert.Equal(reloadedItem2Manual.CampaignId, reloadedItem2Auto.CampaignId);
+            Assert.Equal("Pontus", reloadedItem2Manual.Faction);
+
+            // Campaign 1 and Campaign 2 MUST be distinct!
+            Assert.NotEqual(reloadedItem1Manual.CampaignId, reloadedItem2Manual.CampaignId);
+        }
+
+        [Fact]
+        public void ParserService_SpaceSeparatedManualSaves_ParsesFactionAndDetails()
+        {
+            string save1 = Path.Combine(_gameSaveDir, "save_Pontus Second.sav");
+            File.WriteAllText(save1, "test");
+            var info1 = _parser.ParseSaveFile(save1);
+            Assert.Equal("Pontus", info1.FactionName);
+            Assert.Equal(SaveFileType.Manual, info1.Type);
+
+            string save2 = Path.Combine(_gameSaveDir, "save_Rome 2.sav");
+            File.WriteAllText(save2, "test");
+            var info2 = _parser.ParseSaveFile(save2);
+            Assert.Equal("Rome", info2.FactionName);
+            Assert.Equal(2, info2.Turn);
+            Assert.Equal(SaveFileType.Manual, info2.Type);
+
+            string save3 = Path.Combine(_gameSaveDir, "save_Kingdom of Macedon Turn 10.sav");
+            File.WriteAllText(save3, "test");
+            var info3 = _parser.ParseSaveFile(save3);
+            Assert.Equal("Kingdom of Macedon", info3.FactionName);
+            Assert.Equal(10, info3.Turn);
+            Assert.Equal(SaveFileType.Manual, info3.Type);
+        }
+
+        [Fact]
+        public void ChronicleService_ActiveSavesWithDifferentGuid_AreNotMerged()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+            var chronicle = new ChronicleService(_config, _parser, vault);
+
+            var guid1 = Guid.NewGuid();
+            var guid2 = Guid.NewGuid();
+
+            // Campaign 1 saved in vault
+            string camp1Save = Path.Combine(_gameSaveDir, "save_Pontus.sav");
+            CreateMockSaveWithGuid(camp1Save, guid1, "C1 Content");
+            File.SetLastWriteTime(camp1Save, new DateTime(2026, 9, 19, 1, 0, 0));
+            var item1 = vault.AddSaveFile(camp1Save);
+
+            // Active folder has autosave for Campaign 2 (different GUID, same faction and date)
+            string activeCamp2Auto = Path.Combine(_gameSaveDir, "save_Autosave   Pontus   Turn 5.sav");
+            CreateMockSaveWithGuid(activeCamp2Auto, guid2, "C2 Active Auto");
+            File.SetLastWriteTime(activeCamp2Auto, new DateTime(2026, 9, 19, 1, 10, 0));
+
+            // Building chronicle for Campaign 1 should NOT include active save from Campaign 2!
+            var aar = chronicle.BuildChronicle(item1.CampaignName);
+            Assert.DoesNotContain(aar.Milestones, m => m.Turn == 5 || m.SaveFileName.Contains("Turn 5"));
+        }
+
+        [Fact]
+        public void BackupService_GetActiveCampaigns_SeparatesDistinctPlaythroughsOfSameFaction()
+        {
+            var vault = new SaveVaultService(_config, _parser);
+            var backup = new BackupService(_config, vault);
+
+            var guid1 = Guid.NewGuid();
+            var guid2 = Guid.NewGuid();
+
+            // Active file 1: Pontus Playthrough 1
+            string active1 = Path.Combine(_gameSaveDir, "save_Pontus.sav");
+            CreateMockSaveWithGuid(active1, guid1, "Playthrough 1");
+            File.SetLastWriteTime(active1, new DateTime(2026, 9, 19, 1, 0, 0));
+            vault.AddSaveFile(active1);
+
+            // Active file 2: Pontus Playthrough 2
+            string active2 = Path.Combine(_gameSaveDir, "save_Pontus Second.sav");
+            CreateMockSaveWithGuid(active2, guid2, "Playthrough 2");
+            File.SetLastWriteTime(active2, new DateTime(2026, 9, 19, 1, 30, 0));
+            vault.AddSaveFile(active2);
+
+            var activeCampaigns = backup.GetActiveCampaigns();
+
+            // Must have 2 distinct active campaigns detected, not collapsed into a single "Pontus"
+            Assert.Equal(2, activeCampaigns.Count);
+        }
+
+        [Fact]
+        public void LiveManifest_RebuildCampaignAssignments_CorrectlyGroupsPontus()
+        {
+            if (!File.Exists(@"W:\RTR Save Backups\vault.json")) return;
+            var config = new AppConfig
+            {
+                BackupDirectory = @"W:\RTR Save Backups",
+                GameSaveDirectory = @"C:\Users\eetup.DESKTOP-UM7MOIP\AppData\Local\Feral Interactive\Total War ROME REMASTERED\VFS\Local\Rome\saves"
+            };
+            var vault = new SaveVaultService(config, _parser);
+            vault.RebuildCampaignAssignments();
+
+            var saves = vault.GetAllSaves().Where(s => s.Faction == "Pontus" || s.CampaignName.Contains("Pontus")).ToList();
+            var camp2Manual = saves.FirstOrDefault(s => s.OriginalGameFileName == "save_Pontus Second.sav");
+            var camp2Auto = saves.FirstOrDefault(s => s.OriginalGameFileName.Contains("Turn 1 End") && s.GameCampaignId == camp2Manual?.GameCampaignId);
+
+            Assert.NotNull(camp2Manual);
+            Assert.NotNull(camp2Auto);
+            Assert.Equal(camp2Manual.CampaignId, camp2Auto.CampaignId);
+        }
+
+        [Fact]
+        public void LiveManifest_GetActiveCampaigns_DetectsDistinctPlaythroughs()
+        {
+            string gameDir = @"C:\Users\eetup.DESKTOP-UM7MOIP\AppData\Local\Feral Interactive\Total War ROME REMASTERED\VFS\Local\Rome\saves";
+            if (!Directory.Exists(gameDir) || !File.Exists(@"W:\RTR Save Backups\vault.json")) return;
+
+            var config = new AppConfig
+            {
+                BackupDirectory = @"W:\RTR Save Backups",
+                GameSaveDirectory = gameDir
+            };
+            var vault = new SaveVaultService(config, _parser);
+            var backup = new BackupService(config, vault);
+            var active = backup.GetActiveCampaigns();
+
+            // We have active Pontus files from both Pontus campaigns in the game folder
+            Assert.True(active.ContainsKey("Pontus (syys 2026)"));
+            Assert.True(active.ContainsKey("Pontus (2026-09-19)"));
+
+            // Check files in each campaign
+            var c1Files = active["Pontus (syys 2026)"];
+            var c2Files = active["Pontus (2026-09-19)"];
+
+            Assert.Contains(c1Files, s => s.FileName == "save_Pontus.sav");
+            Assert.DoesNotContain(c1Files, s => s.FileName == "save_Pontus Second.sav");
+            Assert.Contains(c2Files, s => s.FileName == "save_Pontus Second.sav");
+            Assert.DoesNotContain(c2Files, s => s.FileName == "save_Pontus.sav");
+        }
     }
 }

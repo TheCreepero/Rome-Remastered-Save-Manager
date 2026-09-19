@@ -113,12 +113,17 @@ namespace RRM_SM.Services
                 var activeFiles = Directory.GetFiles(activeFolder, "*.sav");
                 var grouped = _parserService.GroupSaveFiles(activeFiles);
                 string faction = campaignName;
+                string? campaignGuid = null;
                 if (_vaultService != null)
                 {
                     var meta = _vaultService.GetCampaignMetadata(campaignId ?? campaignName);
-                    if (meta != null && !string.IsNullOrWhiteSpace(meta.Faction))
+                    if (meta != null)
                     {
-                        faction = meta.Faction;
+                        if (!string.IsNullOrWhiteSpace(meta.Faction))
+                        {
+                            faction = meta.Faction;
+                        }
+                        campaignGuid = meta.GameCampaignId;
                     }
                 }
 
@@ -126,6 +131,18 @@ namespace RRM_SM.Services
                 {
                     foreach (var aSave in aSaves)
                     {
+                        // 1. Ground truth GUID match: if both have a GUID, they must match
+                        if (!string.IsNullOrWhiteSpace(campaignGuid) && !string.IsNullOrWhiteSpace(aSave.GameCampaignId))
+                        {
+                            if (!aSave.GameCampaignId.Equals(campaignGuid, StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue; // Belongs to a different campaign playthrough!
+                            }
+                            saveInfos.Add(aSave);
+                            continue;
+                        }
+
+                        // 2. Fallback heuristic for legacy saves without GameCampaignId
                         if (saveInfos.Count == 0)
                         {
                             saveInfos.Add(aSave);

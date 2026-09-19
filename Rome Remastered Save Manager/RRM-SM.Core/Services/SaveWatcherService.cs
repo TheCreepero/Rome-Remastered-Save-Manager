@@ -191,6 +191,16 @@ namespace RRM_SM.Services
                     var saveInfo = _backupService.ParserService.ParseSaveFile(file);
                     string campaign = saveInfo.FactionName;
 
+                    // Match ground-truth campaign from vault if GameCampaignId is available
+                    if (!string.IsNullOrWhiteSpace(saveInfo.GameCampaignId))
+                    {
+                        var matchingCamp = _backupService.VaultService.GetCampaignMetadataByGameCampaignId(saveInfo.GameCampaignId);
+                        if (matchingCamp != null && !string.IsNullOrWhiteSpace(matchingCamp.DisplayName))
+                        {
+                            campaign = matchingCamp.DisplayName;
+                        }
+                    }
+
                     if (string.IsNullOrWhiteSpace(campaign) || campaign.Equals("General", StringComparison.OrdinalIgnoreCase))
                     {
                         // Check if quicksave or fallback to most recent campaign

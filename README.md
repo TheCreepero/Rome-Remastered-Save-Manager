@@ -101,22 +101,27 @@ Total War: ROME REMASTERED generates distinct save file names that encode factio
 | `save_Autosave   {Faction}   Turn {X}.sav` | `save_Autosave   Kingdom of Scotland   Turn 6.sav` | `Kingdom of Scotland` (Turn 6) |
 | `save_Autosave   {Faction}   Turn {X} [Start/End].sav` | `save_Autosave   Pergamon   Turn 20 Start.sav` | `Pergamon` (Turn 20) |
 | `save_{Faction} - {Turn/Details}.sav` | `save_Kingdom of Macedon - 101.sav` | `Kingdom of Macedon` (Turn 101) |
+| `save_{Faction}_{Turn/Details}.sav` | `save_Pontus_Turn 10.sav` | `Pontus` (Turn 10) |
+| `save_{Faction} {Turn/Details}.sav` | `save_Pontus Second.sav` or `save_Rome 2.sav` | `Pontus` / `Rome` (Turn 2) |
 | `save_{Faction} - Battle.sav` | `save_Kingdom of Macedon - Battle.sav` | `Kingdom of Macedon` (Battle) |
 | `save_{Faction}.sav` | `save_Bactria.sav` | `Bactria` |
 | `save_Quicksave.sav` | `save_Quicksave.sav` | Associated with the active campaign |
 
-The Save Manager uses these patterns to group your saves automatically.
+The Save Manager uses these patterns along with the game's internal Campaign GUID to group and track your saves automatically.
 
-### Intelligent Multi-Playthrough Separation (New!)
+### Intelligent Multi-Playthrough Separation
 
 What if you play multiple separate playthroughs with the same faction over months or years?
 For example, a long 500-turn Byzantium campaign started in 2025, and a fresh Byzantium campaign started in late 2026.
 
 Previously, both playthroughs would be lumped into a single generic "Byzantium" bucket, causing turn numbers to scramble and risking that rolling backup pruning deletes saves from your older campaign.
 
-The Save Manager now features **deterministic ground-truth separation with heuristic fallbacks**:
-- **Authoritative Binary Campaign GUID (Ground Truth)**: Total War: ROME REMASTERED generates a unique 16-byte Campaign GUID in every save file header (bytes 36..51). The Save Manager directly reads this GUID upon scanning any `.sav` file. Saves sharing the same internal GUID are 100% guaranteed to be linked to that exact playthrough — even across quicksaves, manual renames, or years between play sessions!
-- **Heuristic Campaign Clustering (Fallback)**: For saves where the header cannot be read or is unavailable:
+The Save Manager features **deterministic ground-truth separation with heuristic fallbacks**:
+- **Authoritative Binary Campaign GUID (Ground Truth)**: Total War: ROME REMASTERED generates a unique 16-byte Campaign GUID in every save file header (bytes 36..51). The Save Manager directly reads this GUID upon scanning any `.sav` file. Saves sharing the same internal GUID are 100% guaranteed to be linked to that exact playthrough across autosaves, quicksaves, and custom manual save names (even with qualifiers like `save_Pontus Second.sav`).
+- **Global Playthrough Clustering**: Saves sharing the same internal GUID are grouped across the vault first. Canonical faction identity is inherited from the game engine's autosaves, ensuring manual saves with custom labels remain permanently united with their autosaves.
+- **Playthrough-Aware Active Campaigns**: The Active Campaign selector and Autosave Sentinel recognize distinct active playthroughs of the same faction in your game folder, routing snapshots to the exact matching campaign without cross-pollination.
+- **Timeline Isolation**: The Campaign Chronologer isolates active and backed-up saves by internal GUID so saves from different playthroughs are never intermingled.
+- **Heuristic Campaign Clustering (Fallback)**: For legacy saves where the header cannot be read or is unavailable:
   - **Temporal Gap Threshold (14 Days)**: If a save for the same faction occurs more than 14 days after the previous save session, it is recognized as a distinct campaign cluster.
   - **Turn Continuity Discontinuity (50 Turns)**: Even if played within days, a dramatic turn jump (e.g. Turn 480 followed by Turn 1) immediately identifies a fresh playthrough.
 - **Automatic Disambiguation**: When multiple campaigns exist for a single faction, the manager automatically gives them clear, timestamped names (e.g. `Byzantium (Feb 2025)` and `Byzantium (Sep 2026)`). If only one campaign exists for a faction, it keeps the clean faction title (e.g. `Kingdom of Macedon`).

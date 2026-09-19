@@ -31,6 +31,19 @@ namespace RRM_SM.Services
             RegexOptions.IgnoreCase | RegexOptions.Compiled,
             RegexTimeout);
 
+        public static readonly string[] KnownFactions = new[]
+        {
+            "Senate and People of Rome", "Republic of Rome", "Western Roman Empire", "Eastern Roman Empire",
+            "The House of Julii", "The House of Brutii", "The House of Scipii", "The House of Claudii",
+            "Kingdom of Macedon", "The Seleucid Empire", "Germanic Tribes", "Greek Cities", "Romano-British",
+            "SPQR I", "SPQR", "Rome", "Macedon", "Macedonia", "Egypt", "Seleucid", "Seleucids",
+            "Carthage", "Parthia", "Pontus", "Gaul", "Gauls", "Germania", "Britannia", "Britons",
+            "Armenia", "Dacia", "Numidia", "Scythia", "Spain", "Thrace", "Bactria", "Rhodes", "Syracuse",
+            "Huns", "Goths", "Vandals", "Sarmatians", "Saxons", "Franks", "Alamanni", "Sassanids",
+            "Celts", "Burgundii", "Lombards", "Roxolani", "Slavs", "Berbers", "Ostrogoths",
+            "Alexander", "Persia", "India", "Dahae", "Illyria"
+        };
+
         public CampaignSaveInfo ParseSaveFile(string filePath)
         {
             var fileInfo = new FileInfo(filePath);
@@ -66,7 +79,7 @@ namespace RRM_SM.Services
                 return saveInfo;
             }
 
-            // 3. Delimited manual save (e.g. save_Kingdom of Macedon - 101.sav)
+            // 3. Delimited manual save (e.g. save_Kingdom of Macedon - 101.sav or save_Pontus_Turn 10.sav)
             var delimMatch = DelimitedSaveRegex.Match(fileName);
             if (delimMatch.Success)
             {
@@ -88,7 +101,56 @@ namespace RRM_SM.Services
                 return saveInfo;
             }
 
-            // 4. Direct save (e.g. save_Bactria.sav)
+            // 4. Space-separated turn manual save (e.g. save_Pontus 5.sav or save_Pontus Turn 5.sav)
+            var turnSpaceMatch = Regex.Match(fileName, @"^save_(?<faction>.+?)\s+(?:turn\s*)?(?<turn>\d+)(?:\s+(?<details>.*))?\.sav$", RegexOptions.IgnoreCase, RegexTimeout);
+            if (turnSpaceMatch.Success)
+            {
+                saveInfo.Type = SaveFileType.Manual;
+                saveInfo.FactionName = CleanFactionName(turnSpaceMatch.Groups["faction"].Value);
+                if (int.TryParse(turnSpaceMatch.Groups["turn"].Value, out int turn))
+                {
+                    saveInfo.Turn = turn;
+                }
+                string details = turnSpaceMatch.Groups["details"].Value.Trim();
+                if (details.IndexOf("battle", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    saveInfo.Type = SaveFileType.Battle;
+                }
+                return saveInfo;
+            }
+
+            // 5. Check if filename matches a known canonical faction followed by space qualifier (e.g. save_Pontus Second.sav, save_Rome 2.sav)
+            if (fileName.StartsWith("save_", StringComparison.OrdinalIgnoreCase) && fileName.EndsWith(".sav", StringComparison.OrdinalIgnoreCase))
+            {
+                string payload = fileName.Substring(5, fileName.Length - 9).Trim();
+                foreach (var known in KnownFactions)
+                {
+                    if (payload.Equals(known, StringComparison.OrdinalIgnoreCase))
+                    {
+                        saveInfo.Type = SaveFileType.Manual;
+                        saveInfo.FactionName = known;
+                        return saveInfo;
+                    }
+                    if (payload.StartsWith(known + " ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        saveInfo.Type = SaveFileType.Manual;
+                        saveInfo.FactionName = known;
+                        string remainder = payload.Substring(known.Length + 1).Trim();
+                        if (remainder.IndexOf("battle", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            saveInfo.Type = SaveFileType.Battle;
+                        }
+                        var remTurn = Regex.Match(remainder, @"^(?:turn\s*)?(?<turn>\d+)", RegexOptions.IgnoreCase, RegexTimeout);
+                        if (remTurn.Success && int.TryParse(remTurn.Groups["turn"].Value, out int t))
+                        {
+                            saveInfo.Turn = t;
+                        }
+                        return saveInfo;
+                    }
+                }
+            }
+
+            // 6. Direct save (e.g. save_Bactria.sav)
             var directMatch = DirectSaveRegex.Match(fileName);
             if (directMatch.Success)
             {
@@ -97,7 +159,7 @@ namespace RRM_SM.Services
                 return saveInfo;
             }
 
-            // 5. Fallback for files without save_ prefix
+            // 7. Fallback for files without save_ prefix
             string baseName = Path.GetFileNameWithoutExtension(fileName);
             if (!string.IsNullOrWhiteSpace(baseName))
             {
