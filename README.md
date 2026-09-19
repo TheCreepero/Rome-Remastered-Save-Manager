@@ -192,7 +192,7 @@ Switch to the **Save Vault** tab:
 - **Filter by Save Type**: Use the **Filter** dropdown (`[All Saves]`, `Manual Backups`, `Sentinel Backups`, `Safety Backups`, `Pinned Milestones`) to narrow down displayed saves.
 - **Filter by Campaign**: Use the **Campaign** dropdown (`[All Campaigns]`, `Kingdom of Macedon`, `Byzantium (Feb 2025)`, `Byzantium (Sep 2026)`, etc.) to view only snapshots for a specific campaign playthrough.
 - **Search Box**: Use the search box (`Ctrl+F`) to filter saves in real time by name, campaign, turn number, notes, or tags.
-- **Data Grid Columns**: Displays Pin status (Pin), Turn number, Campaign / Faction, Name & Details (with `SAFETY` and `SENTINEL` badges), Timestamp, Size, and Format.
+- **Data Grid Columns**: Displays Pin status (Pin), Turn number, Campaign / Faction, Name & Details (with `SAFETY` and `SENTINEL` badges, along with detected in-game calendar dates), Timestamp, Size, and detected Mod / Version.
 
 ---
 
@@ -270,7 +270,6 @@ Under the **Settings** tab, you can customize:
 | :--- | :--- | :--- |
 | **Game Save Directory** | Path where Rome Remastered writes saves. Includes Browse, Auto-Detect, and Open buttons. | Auto-detected |
 | **Backup Storage Directory** | Where all your vault saves and manifests are stored. | `Documents\Rome Remastered Backups` |
-| **Compress backups (.zip)** | Toggle between folder snapshots or compressed `.zip` archives. | Unchecked (`false`) |
 | **Max Backups to Keep** | Limits total stored manual backups per campaign to avoid consuming excessive disk space. Set to `0` for unlimited. | `0` (Unlimited) |
 | **Autosave Sentinel** | Automatically triggers a backup snapshot when the game writes to disk. | Unchecked (`false`) |
 | **Windows Notifications** | Displays balloon notifications when an automated background backup occurs. | Checked (`true`) |
@@ -280,7 +279,6 @@ Under the **Settings** tab, you can customize:
 
 #### Save Vault Maintenance & Storage Tools:
 - **Rebuild Vault Index**: Scans all `.sav` files directly in the backup directory and reconstructs the `vault.json` manifest.
-- **Migrate Legacy Folders**: Scans for old nested backup subdirectories and imports all saves into the flat vault structure.
 - **Rebuild Campaign Assignments**: Re-evaluates and clusters all vault saves by play date (14-day gap) and turn continuity (50 turns) to separate playthroughs.
 - **Clean Unpinned Sentinel Saves**: Removes unpinned Sentinel snapshots to immediately reclaim storage space while preserving all pinned milestones and manual saves.
 
@@ -304,7 +302,7 @@ Or run `RRM-SM.exe` directly in your terminal:
 ================================================================================
   Game Save Folder : C:\Users\...\Rome\saves [OK]
   Backup Directory : C:\Users\...\Rome Remastered Backups [OK]
-  Mode             : Folder Snapshots | Max Backups (per campaign): Unlimited
+  Mode             : Flat Vault (SHA-256) | Max Backups (per campaign): Unlimited
   Active Factions  : Kingdom of Macedon, Rome, Pergamon, Byzantium
   Most Recent Play : Kingdom of Macedon
 ================================================================================
@@ -314,7 +312,7 @@ Or run `RRM-SM.exe` directly in your terminal:
   [4] List All Backups   - View existing snapshots grouped by faction
   [5] Open Active Saves  - Reveal save folder in File Explorer
   [6] Open Backup Folder - Reveal backup folder in File Explorer
-  [7] Settings           - Configure folders, compression, retention
+  [7] Settings           - Configure folders, retention, rebuild index
   [0] Exit
 ================================================================================
 Select an option [0-7]:
@@ -392,10 +390,10 @@ When you save a new quicksave or replay an autosave turn, the game reuses the fi
 Pinning a save marks it as a permanent milestone. Pinned saves are **never** deleted by rolling retention limits or storage cleanup assistants. Use pins for crucial turning points, victorious battles, or before embarking on risky wars!
 
 ### 5. What if `vault.json` gets corrupted or deleted?
-No problem! The Save Vault includes a **Self-Healing Index**. Click **Rebuild Vault Index** in Settings (or run option `[7]` in the CLI). The manager scans all `.sav` files on disk, extracts the campaign and turn data, and recreates `vault.json` automatically.
+No problem! The Save Vault includes a **Self-Healing Index**. Click **Rebuild Vault Index** in Settings (or run option `[6]` in the CLI Settings menu). The manager scans all `.sav` files on disk, extracts the campaign and turn data, and recreates `vault.json` automatically.
 
-### 6. Can I migrate my existing nested backup folders?
-Yes! The Save Vault automatically migrates legacy nested folders on startup, or you can click **Migrate Legacy Folders** in the Settings tab. All nested `.sav` files are moved flat into the root vault and indexed into `vault.json`.
+### 6. Can I migrate my existing legacy nested backup folders?
+Yes! The Save Vault automatically migrates legacy nested folders on startup. All nested `.sav` files are moved flat into the root vault and indexed into `vault.json`.
 
 ### 7. How does Campaign Separation handle new saves?
 When a new save is saved by the game or Sentinel, the manager checks the save's internal Campaign GUID first. If matching a known playthrough, it links directly. If the GUID is not available, it uses temporal proximity (14 days) and turn continuity (50 turns) to route saves accurately.

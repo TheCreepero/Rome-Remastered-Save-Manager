@@ -209,7 +209,10 @@ namespace RRM_SM.Services
                     Source = lastSaved.Source,
                     CampaignId = lastSaved.CampaignId,
                     CampaignName = lastSaved.CampaignName,
-                    Faction = lastSaved.Faction
+                    Faction = lastSaved.Faction,
+                    InGameDate = lastSaved.InGameDate,
+                    CalendarYear = lastSaved.CalendarYear,
+                    ModName = lastSaved.ModName
                 };
             }
 
@@ -254,7 +257,10 @@ namespace RRM_SM.Services
                     Source = lastSaved.Source,
                     CampaignId = lastSaved.CampaignId,
                     CampaignName = lastSaved.CampaignName,
-                    Faction = lastSaved.Faction
+                    Faction = lastSaved.Faction,
+                    InGameDate = lastSaved.InGameDate,
+                    CalendarYear = lastSaved.CalendarYear,
+                    ModName = lastSaved.ModName
                 };
             }
 

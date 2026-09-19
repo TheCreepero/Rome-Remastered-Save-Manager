@@ -100,9 +100,9 @@ namespace RRM_SM
             Console.WriteLine(_config.BackupDirectory);
 
             Console.ForegroundColor = ConsoleColor.Gray;
-            Console.Write("  Mode             : ");
+            Console.Write("  Storage Format   : ");
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write(_config.CompressBackups ? "Compressed (.zip)" : "Folder Snapshots");
+            Console.Write("Flat Vault (SHA-256)");
             Console.ForegroundColor = ConsoleColor.Gray;
             Console.Write(" | Max Backups (per campaign): ");
             Console.ForegroundColor = ConsoleColor.Cyan;
@@ -328,16 +328,15 @@ namespace RRM_SM
                 Console.WriteLine($"  [1] Game Save Directory   : {_config.GameSaveDirectory}");
                 Console.WriteLine($"  [2] Auto-Detect Save Dir  : Scan known locations");
                 Console.WriteLine($"  [3] Backup Directory      : {_config.BackupDirectory}");
-                Console.WriteLine($"  [4] Compression (.zip)    : {(_config.CompressBackups ? "Enabled" : "Disabled")}");
-                Console.WriteLine($"  [5] Max Backups to Keep   : {(_config.MaxBackupsToKeep > 0 ? _config.MaxBackupsToKeep.ToString() : "Unlimited (0)")}");
-                Console.WriteLine($"  [6] Open config.json      : Open file in default editor");
-                Console.WriteLine($"  [7] Rebuild Vault Index   : Scan on-disk .sav files and repair vault.json");
-                Console.WriteLine($"  [8] Migrate Legacy Backups: Import old nested folder snapshots into flat vault");
+                Console.WriteLine($"  [4] Max Backups to Keep   : {(_config.MaxBackupsToKeep > 0 ? _config.MaxBackupsToKeep.ToString() : "Unlimited (0)")}");
+                Console.WriteLine($"  [5] Open config.json      : Open file in default editor");
+                Console.WriteLine($"  [6] Rebuild Vault Index   : Scan on-disk .sav files and repair vault.json");
+                Console.WriteLine($"  [7] Migrate Legacy Backups: Import old nested folder snapshots into flat vault");
                 Console.WriteLine($"  [0] Back to Main Menu");
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
                 Console.WriteLine("--------------------------------------------------------------------------------");
                 Console.ResetColor();
-                Console.Write("\nSelect a setting to edit [0-8]: ");
+                Console.Write("\nSelect a setting to edit [0-7]: ");
 
                 string? choice = Console.ReadLine()?.Trim();
                 switch (choice)
@@ -379,12 +378,6 @@ namespace RRM_SM
                         WaitForKey();
                         break;
                     case "4":
-                        _config.CompressBackups = !_config.CompressBackups;
-                        _configService.SaveConfig(_config);
-                        PrintColored($"Compression changed to: {(_config.CompressBackups ? "Enabled (.zip)" : "Disabled (Folders)")}", ConsoleColor.Green);
-                        WaitForKey();
-                        break;
-                    case "5":
                         Console.Write("\nEnter maximum user backups to keep per campaign (0 for unlimited): ");
                         if (int.TryParse(Console.ReadLine()?.Trim(), out int maxBackups) && maxBackups >= 0)
                         {
@@ -398,7 +391,7 @@ namespace RRM_SM
                         }
                         WaitForKey();
                         break;
-                    case "6":
+                    case "5":
                         try
                         {
                             Process.Start(new ProcessStartInfo
@@ -413,7 +406,7 @@ namespace RRM_SM
                             WaitForKey();
                         }
                         break;
-                    case "7":
+                    case "6":
                         try
                         {
                             PrintColored("--> Rebuilding vault index from on-disk .sav files...", ConsoleColor.Cyan);
@@ -426,7 +419,7 @@ namespace RRM_SM
                         }
                         WaitForKey();
                         break;
-                    case "8":
+                    case "7":
                         try
                         {
                             PrintColored("--> Scanning for legacy nested backup folders...", ConsoleColor.Cyan);

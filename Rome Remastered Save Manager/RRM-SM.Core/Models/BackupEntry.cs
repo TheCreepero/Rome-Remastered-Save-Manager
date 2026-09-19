@@ -30,6 +30,9 @@ namespace RRM_SM.Models
         public string? CampaignId { get; set; }
         public string CampaignName { get; set; } = "General";
         public string? Faction { get; set; }
+        public string? InGameDate { get; set; }
+        public int? CalendarYear { get; set; }
+        public string? ModName { get; set; }
 
         public string FormattedSize
         {

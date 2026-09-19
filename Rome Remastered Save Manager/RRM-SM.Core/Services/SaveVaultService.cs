@@ -1517,7 +1517,10 @@ namespace RRM_SM.Services
                     Source = s.Source,
                     CampaignId = s.CampaignId,
                     CampaignName = s.CampaignName,
-                    Faction = s.Faction
+                    Faction = s.Faction,
+                    InGameDate = s.InGameDate,
+                    CalendarYear = s.CalendarYear,
+                    ModName = s.ModName
                 })
                 .OrderByDescending(b => b.CreatedAt)
                 .ToList();
