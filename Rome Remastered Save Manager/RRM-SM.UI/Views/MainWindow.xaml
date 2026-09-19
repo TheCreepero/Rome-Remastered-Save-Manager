@@ -529,6 +529,53 @@
                                             <Setter Property="BorderThickness" Value="0,0,1,1"/>
                                             <Setter Property="FontWeight" Value="SemiBold"/>
                                             <Setter Property="FontSize" Value="12"/>
+                                            <Setter Property="Cursor" Value="Hand"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="DataGridColumnHeader">
+                                                        <Border x:Name="HeaderBorder"
+                                                                Background="{TemplateBinding Background}"
+                                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                                Padding="{TemplateBinding Padding}">
+                                                            <Grid VerticalAlignment="Center">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <ContentPresenter Grid.Column="0"
+                                                                                  VerticalAlignment="Center"
+                                                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                                                <Path x:Name="SortArrow"
+                                                                      Grid.Column="1"
+                                                                      Width="8" Height="6"
+                                                                      Margin="6,0,2,0"
+                                                                      Stretch="Fill"
+                                                                      VerticalAlignment="Center"
+                                                                      HorizontalAlignment="Center"
+                                                                      Fill="{StaticResource AccentGold}"
+                                                                      Visibility="Collapsed"/>
+                                                            </Grid>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="SortDirection" Value="Ascending">
+                                                                <Setter TargetName="HeaderBorder" Property="Background" Value="#252545"/>
+                                                                <Setter TargetName="SortArrow" Property="Visibility" Value="Visible"/>
+                                                                <Setter TargetName="SortArrow" Property="Data" Value="M 0 4 L 4 0 L 8 4 Z"/>
+                                                            </Trigger>
+                                                            <Trigger Property="SortDirection" Value="Descending">
+                                                                <Setter TargetName="HeaderBorder" Property="Background" Value="#252545"/>
+                                                                <Setter TargetName="SortArrow" Property="Visibility" Value="Visible"/>
+                                                                <Setter TargetName="SortArrow" Property="Data" Value="M 0 0 L 4 4 L 8 0 Z"/>
+                                                            </Trigger>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="HeaderBorder" Property="Background" Value="#2E2E50"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
                                         </Style>
                                     </DataGrid.ColumnHeaderStyle>
 
@@ -590,7 +637,7 @@
 
                                     <DataGrid.Columns>
                                         <!-- Pin / Favorite Column -->
-                                        <DataGridTemplateColumn Header="⭐" Width="40">
+                                        <DataGridTemplateColumn Header="⭐" Width="40" SortMemberPath="IsPinned">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Button Command="{Binding DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
