@@ -76,67 +76,112 @@ namespace RRM_SM.Services
 
         private static void ExtractMods(byte[] buffer, SaveMetadata meta)
         {
-            int modMarkerPos = IndexOf(buffer, ModMarker, 0, Math.Min(buffer.Length, 16384));
             var detectedMods = new List<string>();
+            int limit = Math.Min(buffer.Length - 16, 65536);
 
-            if (modMarkerPos != -1 && modMarkerPos + 8 <= buffer.Length)
+            // Scan through occurrences of ModMarker { 0xD2, 0x02, 0x96, 0x49 }
+            for (int pos = 0; pos <= limit; pos++)
             {
-                int count = BitConverter.ToInt32(buffer, modMarkerPos + 4);
-                int pos = modMarkerPos + 8;
-
-                for (int i = 0; i < count && pos + 10 <= buffer.Length; i++)
+                if (buffer[pos] == ModMarker[0] &&
+                    buffer[pos + 1] == ModMarker[1] &&
+                    buffer[pos + 2] == ModMarker[2] &&
+                    buffer[pos + 3] == ModMarker[3])
                 {
-                    pos += 8; // skip mod ID / hash
-                    int nameLen = BitConverter.ToUInt16(buffer, pos);
-                    pos += 2;
-
-                    if (nameLen > 0 && pos + nameLen * 2 <= buffer.Length)
+                    int count = BitConverter.ToInt32(buffer, pos + 4);
+                    if (count > 0 && count <= 50)
                     {
-                        string rawName = Encoding.Unicode.GetString(buffer, pos, nameLen * 2);
-                        pos += nameLen * 2;
+                        int cur = pos + 8;
+                        var candidateMods = new List<string>();
+                        bool validTable = true;
 
-                        string cleaned = CleanModString(rawName);
-                        if (!string.IsNullOrWhiteSpace(cleaned) && !detectedMods.Contains(cleaned, StringComparer.OrdinalIgnoreCase))
+                        for (int i = 0; i < count; i++)
                         {
-                            detectedMods.Add(cleaned);
+                            if (cur + 10 > buffer.Length) { validTable = false; break; }
+                            cur += 8; // skip 8-byte mod id
+
+                            ushort len = BitConverter.ToUInt16(buffer, cur);
+                            cur += 2;
+
+                            if (len == 0 || len > 150 || cur + len * 2 > buffer.Length)
+                            {
+                                validTable = false;
+                                break;
+                            }
+
+                            string rawName = Encoding.Unicode.GetString(buffer, cur, len * 2);
+                            cur += len * 2;
+
+                            // Validate string has valid printable characters and no control chars
+                            bool hasPrintable = false;
+                            bool hasControl = false;
+                            foreach (char c in rawName)
+                            {
+                                if (char.IsControl(c)) { hasControl = true; break; }
+                                if (!char.IsWhiteSpace(c)) hasPrintable = true;
+                            }
+
+                            if (hasControl || !hasPrintable)
+                            {
+                                validTable = false;
+                                break;
+                            }
+
+                            string cleaned = CleanModString(rawName);
+                            if (!string.IsNullOrWhiteSpace(cleaned))
+                            {
+                                candidateMods.Add(cleaned);
+                            }
                         }
-                    }
-                    else
-                    {
-                        break;
+
+                        if (validTable && candidateMods.Count > 0)
+                        {
+                            foreach (var m in candidateMods)
+                            {
+                                if (!detectedMods.Contains(m, StringComparer.OrdinalIgnoreCase))
+                                {
+                                    detectedMods.Add(m);
+                                }
+                            }
+                            // Valid mod table successfully decoded
+                            break;
+                        }
                     }
                 }
             }
 
-            // Fallback scan of UTF-16 header pool (0x1000..0x3500) if table was empty or not matched
+            // Fallback scan of UTF-16 header pool (0x1000..0x4000) checking both even & odd byte alignments
             if (detectedMods.Count == 0)
             {
-                int scanLimit = Math.Min(buffer.Length - 4, 0x3500);
-                for (int i = 0x1000; i < scanLimit; i += 2)
+                int scanLimit = Math.Min(buffer.Length - 4, 0x4000);
+                for (int startOffset = 0; startOffset < 2; startOffset++)
                 {
-                    if (buffer[i + 1] == 0 && buffer[i] >= 32 && buffer[i] <= 126)
+                    for (int i = 0x1000 + startOffset; i < scanLimit; i += 2)
                     {
-                        int start = i;
-                        var sb = new StringBuilder();
-                        while (i < scanLimit - 1 && buffer[i + 1] == 0 && buffer[i] >= 32 && buffer[i] <= 126)
+                        if (buffer[i + 1] == 0 && buffer[i] >= 32 && buffer[i] <= 126)
                         {
-                            sb.Append((char)buffer[i]);
-                            i += 2;
-                        }
-
-                        string candidate = CleanModString(sb.ToString());
-                        if (candidate.Length >= 4 && !candidate.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && !candidate.StartsWith("campaign/", StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (candidate.IndexOf("surrectum", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                candidate.IndexOf("chivalry", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                candidate.IndexOf("blood mod", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                candidate.IndexOf("submod", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                candidate.IndexOf("ris ", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                candidate.IndexOf("beta", StringComparison.OrdinalIgnoreCase) >= 0)
+                            int start = i;
+                            var sb = new StringBuilder();
+                            while (i < scanLimit - 1 && buffer[i + 1] == 0 && buffer[i] >= 32 && buffer[i] <= 126)
                             {
-                                if (!detectedMods.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+                                sb.Append((char)buffer[i]);
+                                i += 2;
+                            }
+
+                            string candidate = CleanModString(sb.ToString());
+                            if (candidate.Length >= 4 && !candidate.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && !candidate.StartsWith("campaign/", StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (candidate.IndexOf("surrectum", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    candidate.IndexOf("chivalry", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    candidate.IndexOf("imperium", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    candidate.IndexOf("blood mod", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    candidate.IndexOf("submod", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    candidate.IndexOf("ris ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    candidate.IndexOf("beta", StringComparison.OrdinalIgnoreCase) >= 0)
                                 {
-                                    detectedMods.Add(candidate);
+                                    if (!detectedMods.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+                                    {
+                                        detectedMods.Add(candidate);
+                                    }
                                 }
                             }
                         }
@@ -146,19 +191,40 @@ namespace RRM_SM.Services
 
             meta.ActiveMods = detectedMods;
 
-            // Pick primary mod name
+            // Pick primary mod name: prioritize major total conversion / overhaul mods first
             string primary = "Rome Remastered";
             foreach (var m in detectedMods)
             {
                 if (m.IndexOf("surrectum", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    m.IndexOf("imperium", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     m.IndexOf("chivalry", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    m.IndexOf("ris ", StringComparison.OrdinalIgnoreCase) >= 0)
+                    m.IndexOf("ris ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    m.IndexOf("overhaul", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    m.IndexOf("mundus magnus", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    m.IndexOf("rtr", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     primary = m;
                     break;
                 }
             }
 
+            // If no major overhaul matched, pick the first mod that isn't just a UI / camera / graphic tweak
+            if (primary == "Rome Remastered")
+            {
+                foreach (var m in detectedMods)
+                {
+                    if (m.IndexOf("camera", StringComparison.OrdinalIgnoreCase) < 0 &&
+                        m.IndexOf("blood", StringComparison.OrdinalIgnoreCase) < 0 &&
+                        m.IndexOf("dark ui", StringComparison.OrdinalIgnoreCase) < 0 &&
+                        m.IndexOf("ui", StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        primary = m;
+                        break;
+                    }
+                }
+            }
+
+            // Fallback to first mod if still unassigned
             if (primary == "Rome Remastered" && detectedMods.Count > 0)
             {
                 primary = detectedMods[0];

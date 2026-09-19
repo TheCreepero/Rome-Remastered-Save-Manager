@@ -656,6 +656,32 @@ namespace RRM_SM.Services
                 }
             }
 
+            // Enrich existing saves if their ModName is unassigned or set to default "Rome Remastered"
+            foreach (var s in _manifest.Saves)
+            {
+                if (string.IsNullOrWhiteSpace(s.ModName) || s.ModName.Equals("Rome Remastered", StringComparison.OrdinalIgnoreCase))
+                {
+                    string fullPath = Path.Combine(_config.BackupDirectory, s.StoredFileName);
+                    if (File.Exists(fullPath))
+                    {
+                        var meta = SaveMetadataReader.ReadSaveMetadata(fullPath);
+                        if (meta != null && !string.IsNullOrWhiteSpace(meta.PrimaryModName) && !meta.PrimaryModName.Equals("Rome Remastered", StringComparison.OrdinalIgnoreCase))
+                        {
+                            s.ModName = meta.PrimaryModName;
+                            if (string.IsNullOrWhiteSpace(s.InGameDate) && !string.IsNullOrWhiteSpace(meta.InGameDate))
+                            {
+                                s.InGameDate = meta.InGameDate;
+                            }
+                            if (!s.CalendarYear.HasValue && meta.CalendarYear.HasValue)
+                            {
+                                s.CalendarYear = meta.CalendarYear;
+                            }
+                            needsSave = true;
+                        }
+                    }
+                }
+            }
+
             // Automatic Migration & Campaign Separation:
             // If manifest is Version 1 or has saves missing CampaignId, automatically rebuild campaign assignments
             if (_manifest.Version < 2 || (_manifest.Saves.Count > 0 && _manifest.Saves.Any(s => string.IsNullOrWhiteSpace(s.CampaignId))))

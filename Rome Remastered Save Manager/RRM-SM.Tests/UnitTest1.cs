@@ -341,5 +341,54 @@ namespace RRM_SM.Tests
             var matches = emojiRegex.Matches(content);
             Assert.True(matches.Count == 0, $"README.md contains {matches.Count} emoji(s): " + string.Join(", ", matches.Select(m => $"{m.Value} (U+{(m.Value.Length == 1 ? ((int)m.Value[0]).ToString("X4") : char.ConvertToUtf32(m.Value, 0).ToString("X"))})")));
         }
+
+        [Fact]
+        public void SaveMetadataReader_DetectsOverhaulModFromBinarySave()
+        {
+            string tempFile = Path.Combine(_testRoot, "test_rtr_save.sav");
+            using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write))
+            using (var bw = new BinaryWriter(fs))
+            {
+                // Write 8KB of zeros
+                byte[] zeros = new byte[8192];
+                bw.Write(zeros);
+
+                // Write bogus early marker at offset 171
+                fs.Seek(171, SeekOrigin.Begin);
+                bw.Write(new byte[] { 0xD2, 0x02, 0x96, 0x49 });
+                bw.Write(1084227584); // bogus count that would fail validation
+
+                // Write real mod table at 0x1829 (6185)
+                fs.Seek(0x1829, SeekOrigin.Begin);
+                bw.Write(new byte[] { 0xD2, 0x02, 0x96, 0x49 }); // Marker
+                bw.Write((int)3); // 3 mods
+
+                // Mod 1: Camera
+                bw.Write((ulong)1001);
+                string mod1 = "Enhanced Camera Bundle";
+                bw.Write((ushort)mod1.Length);
+                bw.Write(System.Text.Encoding.Unicode.GetBytes(mod1));
+
+                // Mod 2: RTR Imperium Surrectum
+                bw.Write((ulong)1002);
+                string mod2 = "RTR: Imperium Surrectum 0.6.6";
+                bw.Write((ushort)mod2.Length);
+                bw.Write(System.Text.Encoding.Unicode.GetBytes(mod2));
+
+                // Mod 3: Dark UI
+                bw.Write((ulong)1003);
+                string mod3 = "Dark UI 2.0";
+                bw.Write((ushort)mod3.Length);
+                bw.Write(System.Text.Encoding.Unicode.GetBytes(mod3));
+            }
+
+            var meta = SaveMetadataReader.ReadSaveMetadata(tempFile);
+            Assert.NotNull(meta);
+            Assert.Equal(3, meta.ActiveMods.Count);
+            Assert.Contains("Enhanced Camera Bundle", meta.ActiveMods);
+            Assert.Contains("RTR: Imperium Surrectum 0.6.6", meta.ActiveMods);
+            Assert.Contains("Dark UI 2.0", meta.ActiveMods);
+            Assert.Equal("RTR: Imperium Surrectum 0.6.6", meta.PrimaryModName);
+        }
     }
 }

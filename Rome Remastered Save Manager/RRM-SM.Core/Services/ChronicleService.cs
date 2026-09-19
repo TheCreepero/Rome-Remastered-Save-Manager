@@ -173,8 +173,8 @@ namespace RRM_SM.Services
             var newMilestones = new List<ChronicleMilestone>();
             foreach (var save in uniqueSaves)
             {
-                // Ensure in-game date metadata is loaded if file is accessible
-                if (string.IsNullOrWhiteSpace(save.InGameDate) && File.Exists(save.FilePath))
+                // Ensure in-game date and mod metadata is loaded if file is accessible
+                if ((string.IsNullOrWhiteSpace(save.InGameDate) || string.IsNullOrWhiteSpace(save.ModName) || save.ModName.Equals("Rome Remastered", StringComparison.OrdinalIgnoreCase)) && File.Exists(save.FilePath))
                 {
                     var meta = SaveMetadataReader.ReadSaveMetadata(save.FilePath);
                     if (meta != null)
@@ -182,7 +182,10 @@ namespace RRM_SM.Services
                         save.InGameDate = meta.InGameDate;
                         save.CalendarYear = meta.CalendarYear;
                         save.Season = meta.Season;
-                        if (string.IsNullOrWhiteSpace(save.ModName)) save.ModName = meta.PrimaryModName;
+                        if (string.IsNullOrWhiteSpace(save.ModName) || save.ModName.Equals("Rome Remastered", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (!string.IsNullOrWhiteSpace(meta.PrimaryModName)) save.ModName = meta.PrimaryModName;
+                        }
                         if (!save.Turn.HasValue && meta.TurnNumber.HasValue) save.Turn = meta.TurnNumber;
                     }
                 }
@@ -198,7 +201,10 @@ namespace RRM_SM.Services
                     if (string.IsNullOrWhiteSpace(existing.InGameDate)) existing.InGameDate = save.InGameDate;
                     if (!existing.CalendarYear.HasValue) existing.CalendarYear = save.CalendarYear;
                     if (string.IsNullOrWhiteSpace(existing.Season)) existing.Season = save.Season;
-                    if (string.IsNullOrWhiteSpace(existing.ModName)) existing.ModName = save.ModName;
+                    if (string.IsNullOrWhiteSpace(existing.ModName) || existing.ModName.Equals("Rome Remastered", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrWhiteSpace(save.ModName)) existing.ModName = save.ModName;
+                    }
                     newMilestones.Add(existing);
                 }
                 else
