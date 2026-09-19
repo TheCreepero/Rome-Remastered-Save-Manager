@@ -141,7 +141,6 @@ namespace RRM_SM.UI.ViewModels
 
             // Commands
             QuickBackupCommand = new RelayCommand(ExecuteQuickBackup, () => !IsBusy);
-            NamedBackupCommand = new RelayCommand(ExecuteNamedBackup, () => !IsBusy);
             BackupAllCampaignsCommand = new RelayCommand(ExecuteBackupAllCampaigns, () => !IsBusy);
             RestoreCommand = new RelayCommand(ExecuteRestore, () => !IsBusy && SelectedBackup != null);
             DeleteBackupCommand = new RelayCommand(ExecuteDeleteBackup, () => !IsBusy && SelectedBackup != null);
@@ -470,7 +469,6 @@ namespace RRM_SM.UI.ViewModels
         // ───────────────────── Commands ─────────────────────
 
         public ICommand QuickBackupCommand { get; }
-        public ICommand NamedBackupCommand { get; }
         public ICommand BackupAllCampaignsCommand { get; }
         public ICommand RestoreCommand { get; }
         public ICommand DeleteBackupCommand { get; }
@@ -518,45 +516,6 @@ namespace RRM_SM.UI.ViewModels
                 SyncConfigFromViewModel();
                 var entry = await Task.Run(() => _backupService.CreateCampaignBackup(targetCampaign));
                 StatusMessage = $"✔ Backup created: {entry.CampaignName}/{entry.Name} ({entry.FormattedSize}, {entry.FileCount} files)";
-                ExecuteRefreshBackups();
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"✖ Backup failed: {ex.Message}";
-                MessageBox.Show($"Backup failed:\n{ex.Message}", "Backup Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            finally
-            {
-                IsBusy = false;
-            }
-        }
-
-        private async void ExecuteNamedBackup()
-        {
-            string targetCampaign = !string.IsNullOrWhiteSpace(SelectedActiveCampaign)
-                ? SelectedActiveCampaign
-                : _backupService.GetMostRecentCampaign();
-
-            string? name = PromptForInput("Named Backup", $"Enter a tag / custom name for [{targetCampaign}] backup\n(e.g. 'Turn42_Siege', 'Before_Civil_War'):");
-            if (string.IsNullOrWhiteSpace(name))
-                return;
-
-            char[] invalidChars = Path.GetInvalidFileNameChars();
-            string sanitized = new string(name.Where(c => !invalidChars.Contains(c)).ToArray()).Trim();
-            if (string.IsNullOrWhiteSpace(sanitized))
-            {
-                MessageBox.Show("The entered name contains only invalid characters for file names. Please enter a valid name.", "Invalid Name", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            name = sanitized;
-
-            IsBusy = true;
-            StatusMessage = $"Creating backup '{name}' for [{targetCampaign}]...";
-            try
-            {
-                SyncConfigFromViewModel();
-                var entry = await Task.Run(() => _backupService.CreateCampaignBackup(targetCampaign, name));
-                StatusMessage = $"✔ Named backup created: {entry.CampaignName}/{entry.Name} ({entry.FormattedSize})";
                 ExecuteRefreshBackups();
             }
             catch (Exception ex)

@@ -168,12 +168,11 @@ Switch to the **Save Vault** tab:
 
 1. **Active Campaign Selector**: The app inspects your save folder and highlights which campaign was played most recently in the **Active Campaign** dropdown.
 2. **Quick Backup**: Snapshots the active campaign with the current timestamp (`Alt+Q` or `Ctrl+B`).
-3. **Named Backup**: Prompts you for a descriptive tag (e.g. `Siege_Of_Carthage`) and backs up the selected campaign (`Alt+N` or `Ctrl+N`).
-4. **Backup All**: One-click button that scans all detected factions and creates individual, organized backups for each active campaign (`Alt+A`).
-5. **Pin / Unpin**: Mark a save as a permanent milestone (`IsPinned`). Pinned saves are immune to rolling retention pruning.
-6. **Edit Details**: Add or update custom title, notes, and quick tags for any save.
-7. **Clean Unpinned**: Safely deletes unpinned Sentinel snapshots to reclaim disk space while keeping all manual saves and pinned milestones intact.
-8. **Launch Game**: Click the **Launch Game** button in the header bar to launch Total War: ROME REMASTERED directly via Steam.
+3. **Backup All**: One-click button that scans all detected factions and creates individual, organized backups for each active campaign (`Alt+A`).
+4. **Pin / Unpin**: Mark a save as a permanent milestone (`IsPinned`). Pinned saves are immune to rolling retention pruning.
+5. **Edit Details**: Add or update custom title, notes, and quick tags for any save.
+6. **Clean Unpinned**: Safely deletes unpinned Sentinel snapshots to reclaim disk space while keeping all manual saves and pinned milestones intact.
+7. **Launch Game**: Click the **Launch Game** button in the header bar to launch Total War: ROME REMASTERED directly via Steam.
 
 ---
 
@@ -311,15 +310,14 @@ Or run `RRM-SM.exe` directly in your terminal:
 ================================================================================
   [1] Quick Backup       - Snapshot most recent campaign [Kingdom of Macedon]
   [2] Backup All         - Snapshot all active campaigns into faction folders
-  [3] Named Backup       - Snapshot a chosen campaign with a custom label
-  [4] Restore Backup     - Restore past campaign state with safety backup
-  [5] List All Backups   - View existing snapshots grouped by faction
-  [6] Open Active Saves  - Reveal save folder in File Explorer
-  [7] Open Backup Folder - Reveal backup folder in File Explorer
-  [8] Settings           - Configure folders, compression, retention
+  [3] Restore Backup     - Restore past campaign state with safety backup
+  [4] List All Backups   - View existing snapshots grouped by faction
+  [5] Open Active Saves  - Reveal save folder in File Explorer
+  [6] Open Backup Folder - Reveal backup folder in File Explorer
+  [7] Settings           - Configure folders, compression, retention
   [0] Exit
 ================================================================================
-Select an option [0-8]:
+Select an option [0-7]:
 ```
 
 ### Headless Automation & Command-Line Flags

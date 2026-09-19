@@ -12,7 +12,6 @@
     <Window.InputBindings>
         <KeyBinding Key="F5" Command="{Binding RefreshBackupsCommand}"/>
         <KeyBinding Key="B" Modifiers="Control" Command="{Binding QuickBackupCommand}"/>
-        <KeyBinding Key="N" Modifiers="Control" Command="{Binding NamedBackupCommand}"/>
         <KeyBinding Key="R" Modifiers="Control" Command="{Binding RestoreCommand}"/>
     </Window.InputBindings>
 
@@ -428,9 +427,6 @@
                         <Button Content="⚡ _Quick Backup" Command="{Binding QuickBackupCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,6,4"
                                 AutomationProperties.Name="Quick Backup"
                                 AutomationProperties.HelpText="Snapshot active campaign (Alt+Q or Ctrl+B)"/>
-                        <Button Content="🏷 _Named Backup" Command="{Binding NamedBackupCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,6,4"
-                                AutomationProperties.Name="Named Backup"
-                                AutomationProperties.HelpText="Snapshot active campaign with a custom label (Alt+N or Ctrl+N)"/>
                         <Button Content="📦 Backup _All" Command="{Binding BackupAllCampaignsCommand}" Style="{StaticResource ActionButton}" Margin="0,0,6,4"
                                 AutomationProperties.Name="Backup All Campaigns"
                                 AutomationProperties.HelpText="Create backup snapshots for all detected active campaigns (Alt+A)"/>

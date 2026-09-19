@@ -35,13 +35,13 @@ namespace RRM_SM
                 PrintMainMenu();
 
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("\nSelect an option [0-8]: ");
+                Console.Write("\nSelect an option [0-7]: ");
                 Console.ResetColor();
 
                 string? choice = Console.ReadLine()?.Trim();
                 Console.WriteLine();
 
-                switch (choice)
+                switch (choice?.ToLowerInvariant())
                 {
                     case "1":
                         PerformQuickBackup();
@@ -50,21 +50,18 @@ namespace RRM_SM
                         PerformBackupAllCampaigns();
                         break;
                     case "3":
-                        PerformNamedBackup();
-                        break;
-                    case "4":
                         PerformRestore();
                         break;
-                    case "5":
+                    case "4":
                         ViewBackupsList();
                         break;
-                    case "6":
+                    case "5":
                         OpenFolderInExplorer(_config.GameSaveDirectory, "Game Save Folder");
                         break;
-                    case "7":
+                    case "6":
                         OpenFolderInExplorer(_config.BackupDirectory, "Backup Folder");
                         break;
-                    case "8":
+                    case "7":
                         ManageSettings();
                         break;
                     case "0":
@@ -74,7 +71,7 @@ namespace RRM_SM
                         Console.WriteLine("Exiting Rome Remastered Save Manager. Valete!");
                         break;
                     default:
-                        PrintColored("Invalid selection. Please enter a number between 0 and 8.", ConsoleColor.Red);
+                        PrintColored("Invalid selection. Please enter a number between 0 and 7.", ConsoleColor.Red);
                         WaitForKey();
                         break;
                 }
@@ -147,12 +144,11 @@ namespace RRM_SM
             Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine($"  [1] Quick Backup       - Snapshot most recent campaign [{mostRecent}]");
             Console.WriteLine("  [2] Backup All         - Snapshot all active campaigns into faction folders");
-            Console.WriteLine("  [3] Named Backup       - Snapshot a chosen campaign with a custom label");
-            Console.WriteLine("  [4] Restore Backup     - Restore past campaign state with safety backup");
-            Console.WriteLine("  [5] List All Backups   - View existing snapshots grouped by faction");
-            Console.WriteLine("  [6] Open Active Saves  - Reveal save folder in File Explorer");
-            Console.WriteLine("  [7] Open Backup Folder - Reveal backup folder in File Explorer");
-            Console.WriteLine("  [8] Settings           - Configure folders, compression, retention");
+            Console.WriteLine("  [3] Restore Backup     - Restore past campaign state with safety backup");
+            Console.WriteLine("  [4] List All Backups   - View existing snapshots grouped by faction");
+            Console.WriteLine("  [5] Open Active Saves  - Reveal save folder in File Explorer");
+            Console.WriteLine("  [6] Open Backup Folder - Reveal backup folder in File Explorer");
+            Console.WriteLine("  [7] Settings           - Configure folders, compression, retention");
             Console.WriteLine("  [0] Exit");
             Console.ResetColor();
         }
@@ -190,52 +186,6 @@ namespace RRM_SM
             catch (Exception ex)
             {
                 PrintColored($"✖ Backup all failed: {ex.Message}", ConsoleColor.Red);
-            }
-            WaitForKey();
-        }
-
-        private static void PerformNamedBackup()
-        {
-            var active = _backupService.GetActiveCampaigns();
-            string selectedCampaign = _backupService.GetMostRecentCampaign();
-
-            if (active.Count > 1)
-            {
-                Console.WriteLine("Active Campaigns detected:");
-                var keys = active.Keys.ToList();
-                for (int i = 0; i < keys.Count; i++)
-                {
-                    Console.WriteLine($"  [{i + 1}] {keys[i]} ({active[keys[i]].Count} saves)");
-                }
-                Console.Write($"\nSelect campaign [1-{keys.Count}] or press Enter for default [{selectedCampaign}]: ");
-                string? input = Console.ReadLine()?.Trim();
-                if (!string.IsNullOrEmpty(input) && int.TryParse(input, out int sel) && sel >= 1 && sel <= keys.Count)
-                {
-                    selectedCampaign = keys[sel - 1];
-                }
-            }
-
-            Console.Write($"\nEnter a custom label for [{selectedCampaign}] (e.g. 'Turn50_Siege'): ");
-            string? name = Console.ReadLine()?.Trim();
-
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                PrintColored("No name provided. Cancelling backup.", ConsoleColor.Yellow);
-                WaitForKey();
-                return;
-            }
-
-            try
-            {
-                PrintColored($"--> Creating backup '{name}' for campaign [{selectedCampaign}]...", ConsoleColor.Cyan);
-                var entry = _backupService.CreateCampaignBackup(selectedCampaign, name);
-                PrintColored($"✔ Named backup created: {entry.CampaignName} / {entry.Name}", ConsoleColor.Green);
-                Console.WriteLine($"   Files: {entry.FileCount} | Total Size: {entry.FormattedSize}");
-                Console.WriteLine($"   Location: {entry.FullPath}");
-            }
-            catch (Exception ex)
-            {
-                PrintColored($"✖ Backup failed: {ex.Message}", ConsoleColor.Red);
             }
             WaitForKey();
         }
