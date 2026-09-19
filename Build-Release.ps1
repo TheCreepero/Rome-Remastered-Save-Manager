@@ -71,5 +71,11 @@ if ($CreateDesktopShortcut) {
     }
 }
 
+$zipPath = Join-Path $distDir "RomeRemasteredSaveManager-v1.0.0-win-x64.zip"
+Write-Host "Creating release zip archive at $zipPath..." -ForegroundColor Cyan
+if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
+Compress-Archive -Path $targetExe -DestinationPath $zipPath -Force
+Write-Host "[SUCCESS] Standalone release zip created: $zipPath" -ForegroundColor Green
+
 Write-Host "`nYou can copy the 'dist' folder anywhere or run RomeRemasteredSaveManager.exe directly.`n" -ForegroundColor Cyan
 
