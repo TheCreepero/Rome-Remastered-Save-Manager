@@ -19,7 +19,7 @@ A friendly, robust save manager and backup utility for **Total War: ROME REMASTE
   - [Filtering & Searching by Faction & Campaign](#filtering--searching-by-faction--campaign)
   - [Managing Campaigns: Rename, Merge, and Split (New!)](#managing-campaigns-rename-merge-and-split-new)
   - [Autosave Sentinel & Background Monitoring](#autosave-sentinel--background-monitoring)
-  - [Campaign Chronologer & AAR Generator](#campaign-chronologer--aar-generator)
+  - [Campaign Chronologer & AAR Generator (WIP / Preview)](#campaign-chronologer--aar-generator-work-in-progress--preview)
   - [Configuring Settings](#configuring-settings)
 - [Using the Command-Line Interface (CLI)](#using-the-command-line-interface-cli)
   - [Interactive Menu Mode](#interactive-menu-mode)
@@ -52,7 +52,7 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 - **Independent Retention Pools**: Rolling retention limits (manual backups and Sentinel backups) are enforced per campaign playthrough independently. Playing a new campaign will **never** prune older playthroughs of the same faction!
 - **SHA-256 Deduplication**: Identical save files consume zero duplicate disk space.
 - **Rich In-App Organization**: Tag, filter, and organize your saves without filesystem constraints. Mark crucial saves as **Pinned Milestones** (which are protected forever against rolling retention limits), write lore notes, assign tags, and filter instantly between Pinned, Sentinel, Manual, and Safety backups.
-- **Campaign Chronologer & AAR Generator**: Turn your gameplay history into an epic saga. Aggregates your save history into a unified chronological timeline, lets you write journal entries, title milestones, add tags, and export publication-ready After Action Reports in styled HTML or Markdown.
+- **Campaign Chronologer & AAR Generator (WIP / Preview)**: Turn your gameplay history into an epic saga. Aggregates your save history into a unified chronological timeline, lets you write journal entries, title milestones, add tags, and export publication-ready After Action Reports in styled HTML or Markdown. (Experimental preview feature under active development).
 - **Autosave Sentinel (Background Watcher)**: Automatically creates snapshots in real time whenever Rome Remastered writes or updates a save to disk, complete with debouncing, file-lock protection, and single-file differential capture.
 - **System Tray & Desktop Integration**: Minimizes or closes to the Windows notification area, keeps the Autosave Sentinel running quietly while you game, provides balloon notifications, and includes a one-click Steam game launcher (`Launch Game`).
 - **Self-Healing Index & 1-Click Migration**: If `vault.json` is ever lost, the app reconstructs it by scanning all on-disk `.sav` files with its parser. Automatically upgrades manifests and migrates legacy nested backup folders into the flat vault.
@@ -204,9 +204,11 @@ The **Autosave Sentinel** monitors your Rome Remastered game save folder in real
 
 ---
 
-### Campaign Chronologer & AAR Generator (New!)
+### Campaign Chronologer & AAR Generator (Work in Progress / Preview)
 
-The **Campaign Chronicle & AAR** tab turns your collection of saves into an interactive campaign timeline and lets you write your own After Action Reports (AARs) or historical lore journals.
+> **Notice (Work in Progress)**: The Campaign Chronicle & AAR Writer is an experimental preview feature currently under active development. While you can already inspect turn dates, mods, timeline milestones, and export HTML/Markdown reports, additional features and depth are planned for upcoming releases.
+
+The **Campaign Chronicle (WIP)** tab turns your collection of saves into an interactive campaign timeline and lets you write your own After Action Reports (AARs) or historical lore journals.
 
 #### What Does the Chronologer Do?
 - **Unified Timeline Aggregation**: Combines active game saves from your game folder with all archived snapshots from your backup directories into one cohesive chronological timeline ordered by date and turn number.

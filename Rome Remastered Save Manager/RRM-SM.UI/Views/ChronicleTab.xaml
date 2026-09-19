@@ -27,7 +27,10 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Chronicle Campaign:" Foreground="#C9A84C" VerticalAlignment="Center" FontWeight="Bold" FontSize="13" Margin="0,0,8,0"/>
+                    <TextBlock Text="Chronicle Campaign:" Foreground="#C9A84C" VerticalAlignment="Center" FontWeight="Bold" FontSize="13" Margin="0,0,6,0"/>
+                    <Border Background="#4A3B18" CornerRadius="3" Padding="5,2" Margin="0,0,10,0" BorderBrush="#E5C07B" BorderThickness="1" VerticalAlignment="Center" ToolTip="Campaign Chronicler &amp; AAR Writer is an experimental preview feature under active development.">
+                        <TextBlock Text="WIP / PREVIEW" Foreground="#E5C07B" FontWeight="Bold" FontSize="9"/>
+                    </Border>
                     <ComboBox ItemsSource="{Binding AllKnownCampaigns}"
                               SelectedItem="{Binding SelectedChronicleCampaign}"
                               MinWidth="180" Height="28" VerticalContentAlignment="Center" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E"/>
@@ -54,7 +57,7 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="📜 Export HTML" Command="{Binding ExportHtmlReportCommand}" Background="#5A4A20" Foreground="#C9A84C" BorderBrush="#C9A84C" BorderThickness="1" Padding="10,4" Margin="0,0,6,0" Cursor="Hand">
+                    <Button Content="Export HTML" Command="{Binding ExportHtmlReportCommand}" Background="#5A4A20" Foreground="#C9A84C" BorderBrush="#C9A84C" BorderThickness="1" Padding="10,4" Margin="0,0,6,0" Cursor="Hand">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Template">
@@ -74,7 +77,7 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Content="📝 Copy Markdown" Command="{Binding ExportMarkdownReportCommand}" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E" BorderThickness="1" Padding="10,4" Margin="0,0,6,0" Cursor="Hand">
+                    <Button Content="Copy Markdown" Command="{Binding ExportMarkdownReportCommand}" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E" BorderThickness="1" Padding="10,4" Margin="0,0,6,0" Cursor="Hand">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Template">
@@ -94,7 +97,7 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Content="🔄 Refresh" Command="{Binding RefreshChronicleCommand}" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E" BorderThickness="1" Padding="10,4" Cursor="Hand">
+                    <Button Content="Refresh" Command="{Binding RefreshChronicleCommand}" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E" BorderThickness="1" Padding="10,4" Cursor="Hand">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Template">

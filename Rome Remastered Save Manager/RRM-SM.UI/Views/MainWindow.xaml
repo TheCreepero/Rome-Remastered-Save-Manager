@@ -378,7 +378,7 @@
             </TabControl.Resources>
 
             <!-- ─── TAB 1: Save Vault (Backups) ─── -->
-            <TabItem Header="🏛  Save Vault">
+            <TabItem Header="Save Vault">
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -677,12 +677,12 @@
             </TabItem>
 
             <!-- ─── TAB 2: Chronicle & AAR ─── -->
-            <TabItem Header="📜 Campaign Chronicle &amp; AAR">
+            <TabItem Header="Campaign Chronicle (WIP)">
                 <views:ChronicleTab />
             </TabItem>
 
             <!-- ─── TAB 3: Settings ─── -->
-            <TabItem Header="⚙  Settings">
+            <TabItem Header="Settings">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
                     <StackPanel>
 
