@@ -103,9 +103,11 @@ try {
         "Launch Game via Steam",
         "Toggle Autosave Sentinel",
         "Quick Backup",
-        "Named Backup",
         "Backup All Campaigns",
         "Restore Selected Backup",
+        "Pin or Unpin Backup Milestone",
+        "Edit Save Details",
+        "Clean Unpinned Sentinel Saves",
         "Delete Selected Backup",
         "Open Selected Backup in File Explorer",
         "Refresh Backups List"
@@ -249,13 +251,84 @@ try {
             }
             Assert-Condition $debounceFound "Debounce buffer edit control was found on Settings tab"
 
+            # Verify Save Vault Maintenance tools
+            $maintenanceButtons = @(
+                "Rebuild Vault Index",
+                "Rebuild Campaign Assignments",
+                "Clean Unpinned Sentinel Saves (Settings)"
+            )
+            foreach ($expectedMb in $maintenanceButtons) {
+                $mbFound = $false
+                foreach ($b in $settingsButtons) {
+                    if ($b.Current.Name -like "*$expectedMb*") {
+                        $mbFound = $true
+                        Assert-Condition $true "Maintenance button '$expectedMb' found with Name='$($b.Current.Name)'"
+                        break
+                    }
+                }
+                Assert-Condition $mbFound "Maintenance button '$expectedMb' was found on Settings tab"
+            }
+
         } catch {
             Assert-Condition $false "Failed to interact with Settings Tab: $_"
         }
     }
 
-    # 5. System Tray Minimization on Close
-    Write-Host "`n[5/5] Testing System Tray Minimization & Protection on Window Close..." -ForegroundColor Yellow
+    # 5. Chronicle Tab Inspection
+    Write-Host "`n[5/6] Testing Campaign Chronicle Tab Navigation & Controls..." -ForegroundColor Yellow
+    $chronicleTab = $null
+    foreach ($tab in $tabItems) {
+        if ($tab.Current.Name -like "*Chronicle*") {
+            $chronicleTab = $tab
+            break
+        }
+    }
+    Assert-Condition ($null -ne $chronicleTab) "Campaign Chronicle Tab was found in UI"
+    if ($null -ne $chronicleTab) {
+        try {
+            $selPattern = $chronicleTab.GetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern)
+            $selPattern.Select()
+            Start-Sleep -Milliseconds 400
+            Assert-Condition $true "Selected Campaign Chronicle Tab successfully"
+
+            # Check Chronicle controls
+            $chronicleButtons = Find-Descendants $window ([Windows.Automation.ControlType]::Button)
+            $expectedChronicleButtons = @(
+                "Export Chronicle HTML Report",
+                "Copy Chronicle Markdown Report",
+                "Refresh Chronicle"
+            )
+            foreach ($expectedCb in $expectedChronicleButtons) {
+                $cbFound = $false
+                foreach ($b in $chronicleButtons) {
+                    if ($b.Current.Name -like "*$expectedCb*") {
+                        $cbFound = $true
+                        Assert-Condition $true "Chronicle button '$expectedCb' found with Name='$($b.Current.Name)'"
+                        break
+                    }
+                }
+                Assert-Condition $cbFound "Chronicle button '$expectedCb' was found on Chronicle tab"
+            }
+
+            # Check Timeline ListBox
+            $chronicleLists = Find-Descendants $window ([Windows.Automation.ControlType]::List)
+            $listFound = $false
+            foreach ($l in $chronicleLists) {
+                if ($l.Current.Name -like "*Chronicle Milestones Timeline*") {
+                    $listFound = $true
+                    Assert-Condition $true "Timeline ListBox found with Name='$($l.Current.Name)'"
+                    break
+                }
+            }
+            Assert-Condition $listFound "Timeline ListBox was found on Chronicle tab"
+
+        } catch {
+            Assert-Condition $false "Failed to interact with Chronicle Tab: $_"
+        }
+    }
+
+    # 6. System Tray Minimization on Close
+    Write-Host "`n[6/6] Testing System Tray Minimization & Protection on Window Close..." -ForegroundColor Yellow
     $windowPattern = $null
     try {
         $windowPattern = $window.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern)

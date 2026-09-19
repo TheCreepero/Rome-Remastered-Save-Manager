@@ -434,11 +434,17 @@
                                 AutomationProperties.Name="Restore Selected Backup"
                                 AutomationProperties.HelpText="Restore selected backup to game save folder (Alt+R or Enter in list)"/>
                         <Button Content="⭐ _Pin / Unpin" Command="{Binding TogglePinCommand}" CommandParameter="{Binding SelectedBackup}" Style="{StaticResource ActionButton}" Margin="0,0,6,4"
-                                ToolTip="Toggle Milestone Pin (pinned saves are preserved forever and protected from auto-pruning)"/>
+                                ToolTip="Toggle Milestone Pin (pinned saves are preserved forever and protected from auto-pruning)"
+                                AutomationProperties.Name="Pin or Unpin Backup Milestone"
+                                AutomationProperties.HelpText="Toggle Milestone Pin to protect this save from auto-pruning (Alt+P)"/>
                         <Button Content="📝 _Edit Details" Command="{Binding EditSaveMetadataCommand}" Style="{StaticResource ActionButton}" Margin="0,0,6,4"
-                                ToolTip="Edit custom title, notes, and tags for the selected save"/>
+                                ToolTip="Edit custom title, notes, and tags for the selected save"
+                                AutomationProperties.Name="Edit Save Details"
+                                AutomationProperties.HelpText="Edit custom title, notes, and tags for the selected save (Alt+E)"/>
                         <Button Content="🧹 Clean _Unpinned" Command="{Binding CleanUnpinnedSentinelCommand}" Style="{StaticResource DangerButton}" Margin="0,0,6,4"
-                                ToolTip="Delete unpinned Sentinel snapshots to recover disk space while keeping all pinned milestones safe"/>
+                                ToolTip="Delete unpinned Sentinel snapshots to recover disk space while keeping all pinned milestones safe"
+                                AutomationProperties.Name="Clean Unpinned Sentinel Saves"
+                                AutomationProperties.HelpText="Delete unpinned Sentinel snapshots to recover disk space while keeping pinned milestones safe (Alt+U)"/>
                         <Button Content="🗑 _Delete" Command="{Binding DeleteBackupCommand}" Style="{StaticResource DangerButton}" Margin="0,0,6,4"
                                 AutomationProperties.Name="Delete Selected Backup"
                                 AutomationProperties.HelpText="Permanently delete selected backup archive (Alt+D or Delete in list)"/>
@@ -944,11 +950,17 @@
 
                                 <WrapPanel>
                                     <Button Content="🛠 Rebuild Vault Index" Command="{Binding RebuildIndexCommand}" Style="{StaticResource ActionButton}" Margin="0,0,8,4"
-                                            ToolTip="Scans all .sav files directly in the backup directory and reconstructs the vault.json manifest"/>
+                                            ToolTip="Scans all .sav files directly in the backup directory and reconstructs the vault.json manifest"
+                                            AutomationProperties.Name="Rebuild Vault Index"
+                                            AutomationProperties.HelpText="Scans all .sav files directly in the backup directory and reconstructs the vault.json manifest"/>
                                     <Button Content="🔄 Rebuild Campaign Assignments" Command="{Binding RebuildCampaignAssignmentsCommand}" Style="{StaticResource ActionButton}" Margin="0,0,8,4"
-                                            ToolTip="Re-evaluates and clusters all vault saves by play date (14-day gap) and turn continuity (50 turns) to separate playthroughs"/>
+                                            ToolTip="Re-evaluates and clusters all vault saves by play date (14-day gap) and turn continuity (50 turns) to separate playthroughs"
+                                            AutomationProperties.Name="Rebuild Campaign Assignments"
+                                            AutomationProperties.HelpText="Re-evaluates and clusters all vault saves by play date and turn continuity"/>
                                     <Button Content="🧹 Clean Unpinned Sentinel Saves" Command="{Binding CleanUnpinnedSentinelCommand}" Style="{StaticResource DangerButton}" Margin="0,0,8,4"
-                                            ToolTip="Removes all unpinned Sentinel snapshots to immediately reclaim storage space while preserving all pinned milestones"/>
+                                            ToolTip="Removes all unpinned Sentinel snapshots to immediately reclaim storage space while preserving all pinned milestones"
+                                            AutomationProperties.Name="Clean Unpinned Sentinel Saves (Settings)"
+                                            AutomationProperties.HelpText="Removes all unpinned Sentinel snapshots to reclaim storage while keeping milestones"/>
                                 </WrapPanel>
                             </StackPanel>
                         </Border>

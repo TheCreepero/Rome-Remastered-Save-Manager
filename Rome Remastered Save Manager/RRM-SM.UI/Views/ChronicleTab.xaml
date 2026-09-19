@@ -33,7 +33,9 @@
                     </Border>
                     <ComboBox ItemsSource="{Binding AllKnownCampaigns}"
                               SelectedItem="{Binding SelectedChronicleCampaign}"
-                              MinWidth="180" Height="28" VerticalContentAlignment="Center" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E"/>
+                              MinWidth="180" Height="28" VerticalContentAlignment="Center" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E"
+                              AutomationProperties.Name="Chronicle Campaign Selection"
+                              AutomationProperties.HelpText="Select campaign to view timeline and chronicle milestones"/>
                     <Border Background="#5A4A20" CornerRadius="4" Padding="8,4" Margin="10,0,0,0" BorderBrush="#C9A84C" BorderThickness="1">
                         <Border.Style>
                             <Style TargetType="Border">
@@ -57,7 +59,9 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="Export HTML" Command="{Binding ExportHtmlReportCommand}" Background="#5A4A20" Foreground="#C9A84C" BorderBrush="#C9A84C" BorderThickness="1" Padding="10,4" Margin="0,0,6,0" Cursor="Hand">
+                    <Button Content="Export HTML" Command="{Binding ExportHtmlReportCommand}" Background="#5A4A20" Foreground="#C9A84C" BorderBrush="#C9A84C" BorderThickness="1" Padding="10,4" Margin="0,0,6,0" Cursor="Hand"
+                            AutomationProperties.Name="Export Chronicle HTML Report"
+                            AutomationProperties.HelpText="Export campaign chronicle to an HTML report">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Template">
@@ -77,7 +81,9 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Content="Copy Markdown" Command="{Binding ExportMarkdownReportCommand}" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E" BorderThickness="1" Padding="10,4" Margin="0,0,6,0" Cursor="Hand">
+                    <Button Content="Copy Markdown" Command="{Binding ExportMarkdownReportCommand}" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E" BorderThickness="1" Padding="10,4" Margin="0,0,6,0" Cursor="Hand"
+                            AutomationProperties.Name="Copy Chronicle Markdown Report"
+                            AutomationProperties.HelpText="Copy campaign chronicle as Markdown to clipboard">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Template">
@@ -97,7 +103,9 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Content="Refresh" Command="{Binding RefreshChronicleCommand}" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E" BorderThickness="1" Padding="10,4" Cursor="Hand">
+                    <Button Content="Refresh" Command="{Binding RefreshChronicleCommand}" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E" BorderThickness="1" Padding="10,4" Cursor="Hand"
+                            AutomationProperties.Name="Refresh Chronicle"
+                            AutomationProperties.HelpText="Refresh campaign chronicle data">
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Template">
@@ -144,7 +152,9 @@
                              SelectedItem="{Binding SelectedMilestone}"
                              Background="Transparent" BorderThickness="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             Margin="4">
+                             Margin="4"
+                             AutomationProperties.Name="Chronicle Milestones Timeline"
+                             AutomationProperties.HelpText="List of campaign turns and milestones recorded for this campaign">
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="Background" Value="Transparent"/>
