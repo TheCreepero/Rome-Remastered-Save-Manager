@@ -9,8 +9,8 @@ if exist "RomeRemasteredSaveManager.exe" (
 )
 
 :: If in development repository, build incremental changes
-set "CSPROJ=Rome Remastered Save Manager\RRM-SM.UI\RRM-SM.UI.csproj"
-set "EXE_PATH=Rome Remastered Save Manager\RRM-SM.UI\bin\Debug\net10.0-windows\RRM-SM.UI.exe"
+set "CSPROJ=%~dp0Rome Remastered Save Manager\RRM-SM.UI\RRM-SM.UI.csproj"
+set "EXE_PATH=%~dp0Rome Remastered Save Manager\RRM-SM.UI\bin\Debug\net10.0-windows\RRM-SM.UI.exe"
 
 if exist "%CSPROJ%" (
     echo Building Rome Remastered Save Manager UI...
@@ -25,7 +25,7 @@ if exist "%CSPROJ%" (
 
 :: Launch the UI detached so the terminal window doesn't stay open
 if exist "%EXE_PATH%" (
-    start "" /d "%~dp0" "%EXE_PATH%"
+    start "" "%EXE_PATH%"
 ) else (
     echo [ERROR] Executable not found at %EXE_PATH%
     pause
