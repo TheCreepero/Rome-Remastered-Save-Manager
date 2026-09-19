@@ -218,7 +218,7 @@
             <Border Grid.Column="1" Background="#282840" CornerRadius="6" BorderBrush="#3E3E5E" BorderThickness="1" Padding="16">
                 <Grid>
                     <!-- DataContext will fall through, but we bind elements to SelectedMilestone -->
-                    <Grid IsEnabled="{Binding SelectedMilestone, Converter={StaticResource BoolToVis}, FallbackValue=False}">
+                    <Grid IsEnabled="{Binding HasSelectedMilestone}">
                     <Grid.Style>
                         <Style TargetType="Grid">
                             <Setter Property="Visibility" Value="Visible"/>
@@ -331,8 +331,18 @@
                 </Grid>
 
                 <TextBlock Text="Select an event from the timeline to view or edit notes." 
-                           Foreground="#5E5E7E" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Visibility="{Binding SelectedMilestone, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"/>
+                           Foreground="#5E5E7E" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedMilestone}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
                 </Grid>
             </Border>
         </Grid>

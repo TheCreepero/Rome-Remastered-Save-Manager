@@ -426,6 +426,7 @@ namespace RRM_SM.UI.ViewModels
             { 
                 _selectedMilestone = value; 
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(HasSelectedMilestone));
                 
                 // When we select a milestone, we update the tags string
                 if (_selectedMilestone != null)
@@ -438,6 +439,8 @@ namespace RRM_SM.UI.ViewModels
                 }
             }
         }
+
+        public bool HasSelectedMilestone => _selectedMilestone != null;
 
         private string _milestoneTagsString = string.Empty;
         public string MilestoneTagsString
@@ -1159,6 +1162,15 @@ namespace RRM_SM.UI.ViewModels
                 {
                     ChronicleStatsSummary = $"{count} Milestones | Max Turn {totalTurns}";
                 }
+
+                if (ChronicleMilestones.Count > 0)
+                {
+                    SelectedMilestone = ChronicleMilestones.First();
+                }
+                else
+                {
+                    SelectedMilestone = null;
+                }
             }
             catch (Exception ex)
             {
@@ -1181,7 +1193,7 @@ namespace RRM_SM.UI.ViewModels
             try
             {
                 _chronicleService.SaveChronicleNotes(_currentChronicle);
-                StatusMessage = "✔ Journal notes saved successfully.";
+                StatusMessage = "Journal notes saved successfully.";
             }
             catch (Exception ex)
             {

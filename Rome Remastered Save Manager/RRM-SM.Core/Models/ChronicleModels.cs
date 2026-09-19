@@ -1,15 +1,34 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using RRM_SM.Models;
 
 namespace RRM_SM.Core.Models
 {
-    public class ChronicleMilestone
+    public class ChronicleMilestone : INotifyPropertyChanged
     {
+        private string _title = string.Empty;
+        private string _playerNotes = string.Empty;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         public int Turn { get; set; }
         public DateTime Timestamp { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string PlayerNotes { get; set; } = string.Empty;
+        public string Title 
+        { 
+            get => _title; 
+            set { if (_title != value) { _title = value; OnPropertyChanged(); } } 
+        }
+        public string PlayerNotes 
+        { 
+            get => _playerNotes; 
+            set { if (_playerNotes != value) { _playerNotes = value; OnPropertyChanged(); } } 
+        }
         public SaveFileType SaveType { get; set; }
         public long SaveSizeBytes { get; set; }
         public string SaveFileName { get; set; } = string.Empty;
