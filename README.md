@@ -10,23 +10,28 @@ A friendly, robust save manager and backup utility for **Total War: ROME REMASTE
 - [Key Features](#key-features)
 - [Prerequisites](#prerequisites)
 - [Quick Start Guide](#quick-start-guide)
+  - [Option 1: Download Standalone Release (Recommended)](#option-1-download-standalone-release-recommended)
+  - [Option 2: Run via .NET CLI](#option-2-run-via-net-cli)
+  - [Option 3: Build & Run from Source](#option-3-build--run-from-source)
 - [Campaign & Faction Recognition](#campaign--faction-recognition)
-  - [Intelligent Multi-Playthrough Separation](#intelligent-multi-playthrough-separation-new)
+  - [Authoritative Campaign Header Reading](#authoritative-campaign-header-reading)
+  - [Intelligent Multi-Playthrough Separation](#intelligent-multi-playthrough-separation)
 - [Using the Desktop Application (GUI)](#using-the-desktop-application-gui)
   - [First Launch & Setup](#first-launch--setup)
-  - [Creating Backups](#creating-backups)
+  - [Save Vault: Managing & Creating Backups](#save-vault-managing--creating-backups)
   - [Restoring a Past Save](#restoring-a-past-save)
-  - [Filtering & Searching by Faction & Campaign](#filtering--searching-by-faction--campaign)
-  - [Managing Campaigns: Rename, Merge, and Split (New!)](#managing-campaigns-rename-merge-and-split-new)
+  - [Filtering & Searching Saves](#filtering--searching-saves)
+  - [Managing Campaigns: Rename, Merge, and Split](#managing-campaigns-rename-merge-and-split)
   - [Autosave Sentinel & Background Monitoring](#autosave-sentinel--background-monitoring)
-  - [Campaign Chronologer & AAR Generator (WIP / Preview)](#campaign-chronologer--aar-generator-work-in-progress--preview)
-  - [Configuring Settings](#configuring-settings)
+  - [Campaign Chronicle & AAR Writer (Work in Progress / Preview)](#campaign-chronicle--aar-writer-work-in-progress--preview)
+  - [Configuring Settings & Maintenance Tools](#configuring-settings--maintenance-tools)
 - [Using the Command-Line Interface (CLI)](#using-the-command-line-interface-cli)
   - [Interactive Menu Mode](#interactive-menu-mode)
-  - [One-Line Headless Commands (Automation & Shortcuts)](#one-line-headless-commands-automation--shortcuts)
+  - [Headless Automation & Command-Line Flags](#headless-automation--command-line-flags)
 - [Where Are Files Stored?](#where-are-files-stored)
 - [Frequently Asked Questions & Troubleshooting](#frequently-asked-questions--troubleshooting)
 - [Development & Building from Source](#development--building-from-source)
+- [License](#license)
 
 ---
 
@@ -38,7 +43,7 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 - **Multiple campaigns clash**: Juggling active saves between a Roman campaign, a Greek city-state, and a barbarian faction easily gets cluttered.
 - **Multiple playthroughs with the same faction**: If you played Rome in 2024 and start a new Rome campaign today, standard tools mix all the turns together or delete your old saves when pruning!
 - **Experimenting with risky strategies**: Want to see what happens if you incite the Roman Civil War early or declare war on three empires at once?
-- **Game updates & mods**: Updates or testing mods can occasionally corrupt active saves.
+- **Game updates & mods**: Updates or testing overhaul mods (such as *RTR: Imperium Surrectum* or *Chivalry*) can occasionally corrupt active saves.
 
 **Rome Remastered Save Manager** acts like a personal time machine for your campaigns. With one click, it snapshots your current game saves, tags them with meaningful notes (like `"Turn_50_Before_Civil_War"`), and lets you roll back whenever you want — with an automatic safety net so you can never accidentally lose your active game.
 
@@ -47,12 +52,13 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 ## Key Features
 
 - **Flat "Save Vault" Architecture**: All backup saves are stored as discrete, standalone `.sav` files directly inside your backup folder matching the game's flat save directory structure. No nested snapshot labyrinths! Suffixes are appended to disambiguate repeated quicksaves or replayed turns while preserving original filenames.
-- **Intelligent Multi-Playthrough Separation (New!)**: Separate playthroughs of the same faction (e.g. Byzantium in 2025 at Turn 527 vs Byzantium in 2026 at Turn 183) are automatically detected and kept in separate campaigns using temporal clustering (14-day gap) and turn continuity checks (50 turns).
-- **Campaign Organization Tools (New!)**: Rename campaigns, merge split playthroughs, or split individual saves into a new campaign with a right-click. Custom names are preserved while incoming saves continue to route automatically by faction.
+- **Deep Save File Inspection**: Directly parses internal save binary headers to extract the 16-byte Campaign GUID, in-game calendar date (e.g. `Summer 270 BC`), turn number, and active overhaul mods (such as *RTR: Imperium Surrectum*).
+- **Intelligent Multi-Playthrough Separation**: Separate playthroughs of the same faction (e.g. Byzantium in 2025 at Turn 527 vs Byzantium in 2026 at Turn 183) are automatically detected and kept in separate campaigns using authoritative GUID matching and temporal/continuity clustering fallbacks.
+- **Campaign Organization Tools**: Rename campaigns, merge split playthroughs, or split individual saves into a new campaign with a right-click. Custom names are preserved while incoming saves continue to route automatically by faction.
 - **Independent Retention Pools**: Rolling retention limits (manual backups and Sentinel backups) are enforced per campaign playthrough independently. Playing a new campaign will **never** prune older playthroughs of the same faction!
 - **SHA-256 Deduplication**: Identical save files consume zero duplicate disk space.
 - **Rich In-App Organization**: Tag, filter, and organize your saves without filesystem constraints. Mark crucial saves as **Pinned Milestones** (which are protected forever against rolling retention limits), write lore notes, assign tags, and filter instantly between Pinned, Sentinel, Manual, and Safety backups.
-- **Campaign Chronologer & AAR Generator (WIP / Preview)**: Turn your gameplay history into an epic saga. Aggregates your save history into a unified chronological timeline, lets you write journal entries, title milestones, add tags, and export publication-ready After Action Reports in styled HTML or Markdown. (Experimental preview feature under active development).
+- **Campaign Chronicle & AAR Writer (Work in Progress / Preview)**: Turn your gameplay history into an epic saga. Aggregates your save history into a unified chronological timeline, lets you write journal entries, title milestones, add tags, and export publication-ready After Action Reports in styled HTML or Markdown. (Experimental preview feature under active development).
 - **Autosave Sentinel (Background Watcher)**: Automatically creates snapshots in real time whenever Rome Remastered writes or updates a save to disk, complete with debouncing, file-lock protection, and single-file differential capture.
 - **System Tray & Desktop Integration**: Minimizes or closes to the Windows notification area, keeps the Autosave Sentinel running quietly while you game, provides balloon notifications, and includes a one-click Steam game launcher (`Launch Game`).
 - **Self-Healing Index & 1-Click Migration**: If `vault.json` is ever lost, the app reconstructs it by scanning all on-disk `.sav` files with its parser. Automatically upgrades manifests and migrates legacy nested backup folders into the flat vault.
@@ -63,15 +69,20 @@ In *Total War: ROME REMASTERED*, campaigns span dozens of hours and hundreds of 
 ## Prerequisites
 
 - **Operating System**: Windows 10 or Windows 11 (64-bit)
-- **Runtime**: [.NET 10.0 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (or [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) if building/running from source code)
-  - *Note for GUI*: Ensure the **.NET Desktop Runtime 10.0** is installed on Windows.
 - **Game**: Total War: ROME REMASTERED installed on PC (Steam or Feral Interactive release).
+- **Runtime (Optional)**: Standalone release binaries are self-contained and require no .NET installation. If running or building from source code, [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (or [.NET Desktop Runtime 10.0](https://dotnet.microsoft.com/download/dotnet/10.0)) is required.
 
 ---
 
 ## Quick Start Guide
 
-### Option 1: Run via .NET CLI
+### Option 1: Download Standalone Release (Recommended)
+
+1. Download the latest **`RomeRemasteredSaveManager-v1.0.0-win-x64.zip`** from [GitHub Releases](https://github.com/TheCreepero/Rome-Remastered-Save-Manager/releases).
+2. Extract the archive into any folder (e.g. `C:\Tools\RomeRemasteredSaveManager`).
+3. Run `RomeRemasteredSaveManager.exe`. No installer or .NET runtime installation is required!
+
+### Option 2: Run via .NET CLI
 
 If you have the .NET 10 SDK installed:
 
@@ -83,12 +94,15 @@ dotnet run --project "Rome Remastered Save Manager/RRM-SM.UI/RRM-SM.UI.csproj"
 dotnet run --project "Rome Remastered Save Manager/RRM-SM/RRM-SM.csproj"
 ```
 
-### Option 2: Run the Compiled App
+### Option 3: Build & Run from Source
 
-Navigate to the project build folder and double-click:
-```text
-Rome Remastered Save Manager\RRM-SM.UI\bin\Debug\net10.0-windows\RRM-SM.UI.exe
+Run the automated build script to compile the standalone package:
+
+```powershell
+.\Build-Release.ps1
 ```
+
+The resulting executable will be available at `dist\RomeRemasteredSaveManager.exe`.
 
 ---
 
@@ -96,18 +110,23 @@ Rome Remastered Save Manager\RRM-SM.UI\bin\Debug\net10.0-windows\RRM-SM.UI.exe
 
 Total War: ROME REMASTERED generates distinct save file names that encode faction and campaign metadata:
 
-| Savefile Pattern | Example | Parsed Faction |
-| :--- | :--- | :--- |
-| `save_Autosave   {Faction}   Turn {X}.sav` | `save_Autosave   Kingdom of Scotland   Turn 6.sav` | `Kingdom of Scotland` (Turn 6) |
-| `save_Autosave   {Faction}   Turn {X} [Start/End].sav` | `save_Autosave   Pergamon   Turn 20 Start.sav` | `Pergamon` (Turn 20) |
-| `save_{Faction} - {Turn/Details}.sav` | `save_Kingdom of Macedon - 101.sav` | `Kingdom of Macedon` (Turn 101) |
-| `save_{Faction}_{Turn/Details}.sav` | `save_Pontus_Turn 10.sav` | `Pontus` (Turn 10) |
-| `save_{Faction} {Turn/Details}.sav` | `save_Pontus Second.sav` or `save_Rome 2.sav` | `Pontus` / `Rome` (Turn 2) |
-| `save_{Faction} - Battle.sav` | `save_Kingdom of Macedon - Battle.sav` | `Kingdom of Macedon` (Battle) |
-| `save_{Faction}.sav` | `save_Bactria.sav` | `Bactria` |
-| `save_Quicksave.sav` | `save_Quicksave.sav` | Associated with the active campaign |
+| Savefile Pattern | Example | Parsed Faction | Parsed Save Type |
+| :--- | :--- | :--- | :--- |
+| `save_Autosave   {Faction}   Turn {X}.sav` | `save_Autosave   Kingdom of Scotland   Turn 6.sav` | `Kingdom of Scotland` (Turn 6) | Autosave |
+| `save_Autosave   {Faction}   Turn {X} [Start/End].sav` | `save_Autosave   Pergamon   Turn 20 Start.sav` | `Pergamon` (Turn 20) | Autosave |
+| `save_{Faction} - {Turn/Details}.sav` | `save_Kingdom of Macedon - 101.sav` | `Kingdom of Macedon` (Turn 101) | Manual |
+| `save_{Faction}_{Turn/Details}.sav` | `save_Pontus_Turn 10.sav` | `Pontus` (Turn 10) | Manual |
+| `save_{Faction} {Turn/Details}.sav` | `save_Pontus Second.sav` or `save_Rome 2.sav` | `Pontus` / `Rome` (Turn 2) | Manual |
+| `save_{Faction} - Battle.sav` | `save_Kingdom of Macedon - Battle.sav` | `Kingdom of Macedon` (Battle) | Battle |
+| `save_{Faction}.sav` | `save_Bactria.sav` | `Bactria` | Manual |
+| `save_Quicksave.sav` | `save_Quicksave.sav` | Associated with active campaign | Quicksave |
 
-The Save Manager uses these patterns along with the game's internal Campaign GUID to group and track your saves automatically.
+### Authoritative Campaign Header Reading
+
+In addition to filename parsing, the Save Manager reads internal binary headers from the `.sav` file (via `SaveMetadataReader`):
+- **16-Byte Campaign GUID**: Extracted from bytes 36..51. This unique identifier guarantees 100% accurate playthrough linking across autosaves, quicksaves, and custom manual saves.
+- **In-Game Calendar**: Reads the exact in-game year (BC/AD) and season (Summer/Winter), yielding human-friendly dates such as `Summer 270 BC`.
+- **Mod Detection**: Inspects the active mod table to detect overhaul mods like *RTR: Imperium Surrectum* or *Chivalry*.
 
 ### Intelligent Multi-Playthrough Separation
 
@@ -120,7 +139,7 @@ The Save Manager features **deterministic ground-truth separation with heuristic
 - **Authoritative Binary Campaign GUID (Ground Truth)**: Total War: ROME REMASTERED generates a unique 16-byte Campaign GUID in every save file header (bytes 36..51). The Save Manager directly reads this GUID upon scanning any `.sav` file. Saves sharing the same internal GUID are 100% guaranteed to be linked to that exact playthrough across autosaves, quicksaves, and custom manual save names (even with qualifiers like `save_Pontus Second.sav`).
 - **Global Playthrough Clustering**: Saves sharing the same internal GUID are grouped across the vault first. Canonical faction identity is inherited from the game engine's autosaves, ensuring manual saves with custom labels remain permanently united with their autosaves.
 - **Playthrough-Aware Active Campaigns**: The Active Campaign selector and Autosave Sentinel recognize distinct active playthroughs of the same faction in your game folder, routing snapshots to the exact matching campaign without cross-pollination.
-- **Timeline Isolation**: The Campaign Chronologer isolates active and backed-up saves by internal GUID so saves from different playthroughs are never intermingled.
+- **Timeline Isolation**: The Campaign Chronicle isolates active and backed-up saves by internal GUID so saves from different playthroughs are never intermingled.
 - **Heuristic Campaign Clustering (Fallback)**: For legacy saves where the header cannot be read or is unavailable:
   - **Temporal Gap Threshold (14 Days)**: If a save for the same faction occurs more than 14 days after the previous save session, it is recognized as a distinct campaign cluster.
   - **Turn Continuity Discontinuity (50 Turns)**: Even if played within days, a dramatic turn jump (e.g. Turn 480 followed by Turn 1) immediately identifies a fresh playthrough.
@@ -133,7 +152,7 @@ The Save Manager features **deterministic ground-truth separation with heuristic
 
 ### First Launch & Setup
 
-1. Launch `RRM-SM.UI.exe`.
+1. Launch `RomeRemasteredSaveManager.exe` (or `RRM-SM.UI.exe`).
 2. Click the **Settings** tab.
 3. Look at the **Game Save Directory** indicator:
    - **Directory found**: The application automatically detected where your game stores saves!
@@ -143,39 +162,44 @@ The Save Manager features **deterministic ground-truth separation with heuristic
 
 ---
 
-### Creating Backups
+### Save Vault: Managing & Creating Backups
 
-Switch to the **Backups Manager** tab:
+Switch to the **Save Vault** tab:
 
 1. **Active Campaign Selector**: The app inspects your save folder and highlights which campaign was played most recently in the **Active Campaign** dropdown.
-2. **Quick Backup**: Snapshots the selected campaign with current timestamp.
-3. **Named Backup**: Prompts you for a descriptive tag (e.g. `Siege_Of_Carthage`) and backs up the selected campaign.
-4. **Backup All Campaigns**: One-click button that scans all detected factions and creates individual, organized backups for each active campaign.
+2. **Quick Backup**: Snapshots the active campaign with the current timestamp (`Alt+Q` or `Ctrl+B`).
+3. **Named Backup**: Prompts you for a descriptive tag (e.g. `Siege_Of_Carthage`) and backs up the selected campaign (`Alt+N` or `Ctrl+N`).
+4. **Backup All**: One-click button that scans all detected factions and creates individual, organized backups for each active campaign (`Alt+A`).
+5. **Pin / Unpin**: Mark a save as a permanent milestone (`IsPinned`). Pinned saves are immune to rolling retention pruning.
+6. **Edit Details**: Add or update custom title, notes, and quick tags for any save.
+7. **Clean Unpinned**: Safely deletes unpinned Sentinel snapshots to reclaim disk space while keeping all manual saves and pinned milestones intact.
+8. **Launch Game**: Click the **Launch Game** button in the header bar to launch Total War: ROME REMASTERED directly via Steam.
 
 ---
 
 ### Restoring a Past Save
 
-1. In the **Backups Manager** list, click on the backup you want to return to.
-2. Click **Restore Selected**.
+1. In the **Save Vault** list, click on the backup save you want to return to.
+2. Click **Restore Selected** (or press `Enter` / double-click).
 3. A confirmation dialog will appear:
    - The app will ask if you would like to create a **Safety Backup** of your currently active saves before proceeding.
-   - Click **Yes** (recommended). The app saves your current campaign state as `SafetyBackup_PreRestore_[Timestamp]` and restores the chosen snapshot into the game's folder.
-4. Start or switch back to Rome Remastered and load the save file!
+   - Click **Yes** (recommended). The app snapshots your current campaign state as `SafetyBackup_PreRestore_[Timestamp]` and restores the chosen save into the game's saves folder.
+4. Switch back to Rome Remastered and load the save!
 
 ---
 
-### Filtering & Searching by Faction & Campaign
+### Filtering & Searching Saves
 
-- **Filter by Campaign**: Use the dropdown above the data grid (`[All Campaigns]`, `Kingdom of Macedon`, `Byzantium (Feb 2025)`, `Byzantium (Sep 2026)`, etc.) to view only snapshots for a specific campaign.
-- **Search**: Use the search box to filter backups by custom tag, turn number, date, or note text.
-- **Campaign Column**: The data grid clearly displays the **Campaign** and underlying **Faction** associated with every backup.
+- **Filter by Save Type**: Use the **Filter** dropdown (`[All Saves]`, `Manual Backups`, `Sentinel Backups`, `Safety Backups`, `Pinned Milestones`) to narrow down displayed saves.
+- **Filter by Campaign**: Use the **Campaign** dropdown (`[All Campaigns]`, `Kingdom of Macedon`, `Byzantium (Feb 2025)`, `Byzantium (Sep 2026)`, etc.) to view only snapshots for a specific campaign playthrough.
+- **Search Box**: Use the search box (`Ctrl+F`) to filter saves in real time by name, campaign, turn number, notes, or tags.
+- **Data Grid Columns**: Displays Pin status (Pin), Turn number, Campaign / Faction, Name & Details (with `SAFETY` and `SENTINEL` badges), Timestamp, Size, and Format.
 
 ---
 
-### Managing Campaigns: Rename, Merge, and Split (New!)
+### Managing Campaigns: Rename, Merge, and Split
 
-Right-click any save in the **Backups Manager** list to access campaign management tools:
+Right-click any save in the **Save Vault** list to access campaign management tools:
 
 - **Rename Campaign...**: Give your campaign a custom roleplay or descriptive name (e.g. `Roman Reclamation` or `Greek Hegemony`).
   - *Smart Routing*: The manager remembers the underlying faction. Future autosaves from this playthrough continue to be routed smoothly into this campaign!
@@ -192,9 +216,9 @@ The **Autosave Sentinel** monitors your Rome Remastered game save folder in real
 1. **How It Works**:
    - Whenever Rome Remastered saves the game (end of turn autosave, quicksave, or manual battle save), the Sentinel detects the file write.
    - It utilizes a customizable **debounce buffer** (default `1500 ms`) to let the game finish its multi-stage disk flush cleanly.
-   - Built-in file lock retry logic (`WaitForFileAvailable`) safely waits for the game engine to release exclusive file locks before copying.
+   - Built-in file lock retry logic safely waits for the game engine to release exclusive file locks before copying.
    - **Targeted Storage-Efficient Snapshots**: Sentinel copies **only the specific save file(s)** that were written during that turn, rather than cloning every campaign save file. This saves up to 90% disk space per turn!
-   - Snapshots are automatically tagged with turn information (e.g. `Backup_YYYY-MM-DD_HH-mm-ss_AutosaveSentinel_Turn188`) and display a distinct cyan `SENTINEL` badge in the UI list.
+   - Snapshots are automatically tagged with turn information and display a distinct `SENTINEL` badge in the UI list.
    - **Independent Rolling Pool**: Sentinel snapshots are managed by a separate rolling limit (`MaxSentinelBackupsToKeep`, default 15). Sentinel will **never** delete your manual checkpoints!
 2. **Interactive Header Pill & System Tray**:
    - Click the **`Sentinel: Active` / `Sentinel: Off`** badge in the window header to quickly toggle monitoring on and off.
@@ -204,31 +228,32 @@ The **Autosave Sentinel** monitors your Rome Remastered game save folder in real
 
 ---
 
-### Campaign Chronologer & AAR Generator (Work in Progress / Preview)
+### Campaign Chronicle & AAR Writer (Work in Progress / Preview)
 
-> **Notice (Work in Progress)**: The Campaign Chronicle & AAR Writer is an experimental preview feature currently under active development. While you can already inspect turn dates, mods, timeline milestones, and export HTML/Markdown reports, additional features and depth are planned for upcoming releases.
+> **Notice (Work in Progress)**: The Campaign Chronicle & AAR Writer is an experimental preview feature currently under active development. While you can already inspect turn dates, active overhaul mods, timeline milestones, and export HTML/Markdown reports, additional deep save inspection features are planned for upcoming releases.
 
 The **Campaign Chronicle (WIP)** tab turns your collection of saves into an interactive campaign timeline and lets you write your own After Action Reports (AARs) or historical lore journals.
 
-#### What Does the Chronologer Do?
+#### What Does the Chronicle Tab Do?
 - **Unified Timeline Aggregation**: Combines active game saves from your game folder with all archived snapshots from your backup directories into one cohesive chronological timeline ordered by date and turn number.
+- **In-Game Calendar & Mod Display**: Displays extracted in-game dates (e.g. `Summer 270 BC`) and active mod badges (e.g. `RTR: Imperium Surrectum`).
 - **De-duplication**: Identifies saves across folders by name and timestamp so your timeline remains clean and accurate without redundant duplicate entries.
 - **Per-Turn Milestone Journaling**: Click on any milestone/turn on the timeline to write custom event headlines, lore notes, battle summaries, and tags.
-- **Portable Note Storage (`chronicle.json`)**: All your journal entries and tags are saved inside a lightweight `chronicle.json` file inside that specific campaign's backup directory. Your notes naturally travel alongside your backups if you move or sync folders!
+- **Portable Note Storage (`chronicle.json`)**: All your journal entries and tags are saved inside a lightweight `chronicle.json` file inside your backup directory. Your notes naturally travel alongside your backups if you move or sync folders!
 - **One-Click Publishing (HTML & Markdown)**: Generates complete, styled After Action Reports with a single click.
 
 #### Step-by-Step Instructions:
 1. **Select a Campaign**:
-   - Switch to the **Campaign Chronicle & AAR** tab.
-   - In the **Chronicle Campaign** dropdown at the top, select the campaign or faction you want to view (e.g., `Republic of Rome` or `Kingdom of Macedon`).
-   - The summary badge will immediately display total milestones detected and the highest reached turn (e.g., `42 Milestones | Max Turn 185`).
+   - Switch to the **Campaign Chronicle (WIP)** tab.
+   - In the **Chronicle Campaign** dropdown at the top, select the campaign you want to view.
+   - The summary badge will immediately display total milestones detected and the highest reached turn (e.g. `42 Milestones | Max Turn 185`).
 2. **Browse the Timeline**:
    - The left pane displays all historical milestones sorted chronologically.
-   - Each entry shows the turn badge (`T6`, `T20`, etc.), save category (`Autosave`, `Manual`, `Battle`, `Quicksave`), timestamp, and custom event headline.
+   - Each entry shows the turn badge (`T6`, `T20`, etc.), event title, in-game calendar date, save category (`Autosave`, `Manual`, `Battle`, `Quicksave`), and timestamp.
 3. **Record Journal Notes & Milestones**:
    - Click any milestone in the timeline. The right pane will open the **Journal Editor**.
    - **Event Title / Headline**: Give this turn a memorable name (e.g., *The Siege of Syracuse*, *Defeat of the Gallic Horde*, *First Senate Triumph*).
-   - **Journal Notes**: Write your in-character roleplay lore, tactical notes, thoughts, or battle summaries. Supports multi-line paragraphs.
+   - **Journal Notes**: Write your in-character roleplay lore, tactical notes, thoughts, or battle summaries. Supports multi-line text.
    - **Quick Tags**: Enter comma-separated tags (e.g., `Battle, Expansion, Crisis, Economy`) to categorize the event.
    - Click **Save Journal Notes** to commit the notes to `chronicle.json`.
 4. **Export After Action Reports (AAR)**:
@@ -238,21 +263,27 @@ The **Campaign Chronicle (WIP)** tab turns your collection of saves into an inte
 
 ---
 
-### Configuring Settings
+### Configuring Settings & Maintenance Tools
 
 Under the **Settings** tab, you can customize:
 
 | Setting | Description | Default |
 | :--- | :--- | :--- |
-| **Game Save Directory** | Path where Rome Remastered writes saves. | Auto-detected |
-| **Backup Storage Directory** | Where all your snapshots are stored. | `Documents\Rome Remastered Backups` |
-| **Compress backups (.zip)** | Toggle between folder snapshots or compressed `.zip` archives to save disk space. | Unchecked (Folder snapshots) |
-| **Max Backups to Keep** | Limits total stored backups per campaign to avoid consuming too much disk space. Set to `0` for unlimited. | `0` (Unlimited) |
+| **Game Save Directory** | Path where Rome Remastered writes saves. Includes Browse, Auto-Detect, and Open buttons. | Auto-detected |
+| **Backup Storage Directory** | Where all your vault saves and manifests are stored. | `Documents\Rome Remastered Backups` |
+| **Compress backups (.zip)** | Toggle between folder snapshots or compressed `.zip` archives. | Unchecked (`false`) |
+| **Max Backups to Keep** | Limits total stored manual backups per campaign to avoid consuming excessive disk space. Set to `0` for unlimited. | `0` (Unlimited) |
 | **Autosave Sentinel** | Automatically triggers a backup snapshot when the game writes to disk. | Unchecked (`false`) |
 | **Windows Notifications** | Displays balloon notifications when an automated background backup occurs. | Checked (`true`) |
-| **System Tray** | Minimizes/closes the app to the Windows tray so background monitoring continues uninterrupted. | Checked (`true`) |
+| **System Tray** | Minimizes/closes the app to the Windows notification tray so background monitoring continues uninterrupted. | Checked (`true`) |
 | **Save Detection Buffer** | Debounce delay in milliseconds before copying saves to guarantee file flushes are completed. | `1500 ms` |
 | **Sentinel Rolling Limit** | Max automated Sentinel snapshots to keep per campaign. Independent from manual backups. | `15` (0 = unlimited) |
+
+#### Save Vault Maintenance & Storage Tools:
+- **Rebuild Vault Index**: Scans all `.sav` files directly in the backup directory and reconstructs the `vault.json` manifest.
+- **Migrate Legacy Folders**: Scans for old nested backup subdirectories and imports all saves into the flat vault structure.
+- **Rebuild Campaign Assignments**: Re-evaluates and clusters all vault saves by play date (14-day gap) and turn continuity (50 turns) to separate playthroughs.
+- **Clean Unpinned Sentinel Saves**: Removes unpinned Sentinel snapshots to immediately reclaim storage space while preserving all pinned milestones and manual saves.
 
 ---
 
@@ -266,7 +297,7 @@ Run without arguments:
 ```bash
 dotnet run --project "Rome Remastered Save Manager/RRM-SM/RRM-SM.csproj"
 ```
-Or run `RRM-SM.exe` directly in your terminal. You will see an interactive menu:
+Or run `RRM-SM.exe` directly in your terminal:
 
 ```text
 ================================================================================
@@ -291,9 +322,7 @@ Or run `RRM-SM.exe` directly in your terminal. You will see an interactive menu:
 Select an option [0-8]:
 ```
 
----
-
-### One-Line Headless Commands (Automation & Shortcuts)
+### Headless Automation & Command-Line Flags
 
 ```bash
 # 1. Quick backup of the most recently played campaign
@@ -326,16 +355,21 @@ Depending on your platform and Steam settings, the game typically stores saves i
   ```text
   %LOCALAPPDATA%\Feral Interactive\Total War ROME REMASTERED\VFS\Local\Rome\saves
   ```
+- **Feral VFS Base Local Path**:
+  ```text
+  %LOCALAPPDATA%\Feral Interactive\Total War ROME REMASTERED\VFS\Local
+  ```
 - **Steam Cloud Userdata**:
   ```text
   C:\Program Files (x86)\Steam\userdata\<YourSteamID>\885970\remote
   ```
 
 ### Save Vault Directory (Flat Layout)
-All backups exist as discrete, standalone `.sav` files directly inside your backup folder matching the game's flat save directory structure alongside a central index (`vault.json`):
+All backups exist as discrete, standalone `.sav` files directly inside your backup folder matching the game's flat save directory structure alongside central indexes:
 ```text
 Rome Remastered Backups/
 ├── vault.json                                                  <-- Metadata manifest & virtual organization
+├── chronicle.json                                              <-- AAR journal notes, milestones, and custom tags
 ├── save_Kingdom of Macedon - 101.sav                           <-- Direct game-ready save
 ├── save_Quicksave.sav                                          <-- Initial quicksave
 ├── save_Quicksave_2026-09-18_23-15-00.sav                      <-- Disambiguated quicksave revision
@@ -366,10 +400,10 @@ No problem! The Save Vault includes a **Self-Healing Index**. Click **Rebuild Va
 Yes! The Save Vault automatically migrates legacy nested folders on startup, or you can click **Migrate Legacy Folders** in the Settings tab. All nested `.sav` files are moved flat into the root vault and indexed into `vault.json`.
 
 ### 7. How does Campaign Separation handle new saves?
-When a new save is saved by the game or Sentinel, the manager checks your active campaigns for that faction. If the save is within 14 days and within 50 turns of an active playthrough, it is automatically routed to that campaign. If a long gap or turn reset occurs, it automatically begins a new campaign playthrough.
+When a new save is saved by the game or Sentinel, the manager checks the save's internal Campaign GUID first. If matching a known playthrough, it links directly. If the GUID is not available, it uses temporal proximity (14 days) and turn continuity (50 turns) to route saves accurately.
 
 ### 8. Will custom campaign names break future autosaves?
-No! If you rename a campaign to e.g. "Roman Reclamation", the manager continues tracking the underlying faction ("Republic of Rome" or "Rome"). Subsequent saves will continue to route seamlessly into your custom-named campaign.
+No! If you rename a campaign to e.g. "Roman Reclamation", the manager continues tracking the underlying faction ("Republic of Rome" or "Rome") and Campaign GUID. Subsequent saves will continue to route seamlessly into your custom-named campaign.
 
 ---
 
@@ -381,6 +415,9 @@ dotnet build "Rome Remastered Save Manager/Rome Remastered Save Manager.sln"
 
 # Run automated tests
 dotnet test "Rome Remastered Save Manager/Rome Remastered Save Manager.sln"
+
+# Build standalone win-x64 release package
+powershell -ExecutionPolicy Bypass -File .\Build-Release.ps1
 ```
 
 ---

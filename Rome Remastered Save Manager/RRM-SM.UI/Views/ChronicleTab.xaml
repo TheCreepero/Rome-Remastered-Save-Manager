@@ -307,7 +307,7 @@
                     </StackPanel>
 
                     <!-- Save Button -->
-                    <Button Grid.Row="4" Content="💾 Save Journal Notes" Command="{Binding SaveMilestoneNotesCommand}" HorizontalAlignment="Left"
+                    <Button Grid.Row="4" Content="Save Journal Notes" Command="{Binding SaveMilestoneNotesCommand}" HorizontalAlignment="Left"
                             Background="#5A4A20" Foreground="#C9A84C" BorderBrush="#C9A84C" BorderThickness="1" Padding="16,8" Cursor="Hand">
                         <Button.Style>
                             <Style TargetType="Button">
