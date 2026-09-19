@@ -35,10 +35,10 @@ if ($SelfContained) {
     $publishArgs += "--self-contained", "false"
 }
 
-$proc = Start-Process -FilePath "dotnet" -ArgumentList ($publishArgs -join " ") -NoNewWindow -PassThru -Wait
-if ($proc.ExitCode -ne 0) {
-    Write-Error "dotnet publish failed with exit code $($proc.ExitCode)"
-    exit $proc.ExitCode
+& dotnet @publishArgs
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "dotnet publish failed with exit code $LASTEXITCODE"
+    exit $LASTEXITCODE
 }
 
 $exePath = Join-Path $distDir "RRM-SM.UI.exe"
