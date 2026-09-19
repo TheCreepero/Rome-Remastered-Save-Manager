@@ -151,6 +151,190 @@ namespace RRM_SM.Tests
             Assert.Contains("### Carthage Falls", md);
             Assert.Contains("The city is ours.", md);
         }
+
+        private byte[] CreateMockSaveHeader(Guid campaignGuid, int turnNumber, int calendarYear, int season, string? modName = null)
+        {
+            byte[] header = new byte[2048];
+
+            // GUID at bytes 36..51
+            byte[] guidBytes = campaignGuid.ToByteArray();
+            Buffer.BlockCopy(guidBytes, 0, header, 36, 16);
+
+            // Mod table marker 0xD2, 0x02, 0x96, 0x49 at offset 100
+            int pos = 100;
+            if (!string.IsNullOrEmpty(modName))
+            {
+                header[pos++] = 0xD2;
+                header[pos++] = 0x02;
+                header[pos++] = 0x96;
+                header[pos++] = 0x49;
+
+                BitConverter.GetBytes(1).CopyTo(header, pos); // count = 1
+                pos += 4;
+
+                BitConverter.GetBytes((long)98765432).CopyTo(header, pos); // mod ID
+                pos += 8;
+
+                BitConverter.GetBytes((ushort)modName.Length).CopyTo(header, pos);
+                pos += 2;
+
+                byte[] nameBytes = System.Text.Encoding.Unicode.GetBytes(modName);
+                Buffer.BlockCopy(nameBytes, 0, header, pos, nameBytes.Length);
+            }
+
+            // descr_strat.txt at offset 400
+            pos = 400;
+            byte[] dsBytes = System.Text.Encoding.Unicode.GetBytes("descr_strat.txt");
+            Buffer.BlockCopy(dsBytes, 0, header, pos, dsBytes.Length);
+            pos += dsBytes.Length;
+
+            // token/pointer (4 bytes)
+            BitConverter.GetBytes(0x000044A8).CopyTo(header, pos);
+            pos += 4;
+            header[pos++] = 0x01; // marker
+
+            // rawTurn (0-indexed)
+            BitConverter.GetBytes(turnNumber - 1).CopyTo(header, pos);
+            pos += 4;
+
+            // rawYear (signed int32)
+            BitConverter.GetBytes(calendarYear).CopyTo(header, pos);
+            pos += 4;
+
+            // rawSeason (0 = Summer, 2 = Winter)
+            BitConverter.GetBytes(season).CopyTo(header, pos);
+            pos += 4;
+
+            return header;
+        }
+
+        [Fact]
+        public void SaveMetadataReader_ReadsCalendarAndGuid_Correctly()
+        {
+            // Arrange
+            var expectedGuid = Guid.NewGuid();
+            string modName = "[PublicBETA] RIS 0.7.0 v7.18";
+            byte[] header = CreateMockSaveHeader(expectedGuid, 101, -245, 2, modName);
+
+            string savePath = Path.Combine(_activeDir, "test_macedon.sav");
+            File.WriteAllBytes(savePath, header);
+
+            // Act
+            var meta = SaveMetadataReader.ReadSaveMetadata(savePath);
+
+            // Assert
+            Assert.NotNull(meta);
+            Assert.Equal(expectedGuid.ToString("D"), meta.GameCampaignId);
+            Assert.Equal(101, meta.TurnNumber);
+            Assert.Equal(-245, meta.CalendarYear);
+            Assert.Equal("Winter", meta.Season);
+            Assert.Equal("Winter 245 BC", meta.InGameDate);
+            Assert.Equal(modName, meta.PrimaryModName);
+        }
+
+        [Fact]
+        public void SaveMetadataReader_HandlesADDatesAndSummer()
+        {
+            // Arrange
+            var expectedGuid = Guid.NewGuid();
+            string modName = "Chivalry Total War: REMASTERED";
+            byte[] header = CreateMockSaveHeader(expectedGuid, 6, 1074, 0, modName);
+
+            string savePath = Path.Combine(_activeDir, "test_scotland.sav");
+            File.WriteAllBytes(savePath, header);
+
+            // Act
+            var meta = SaveMetadataReader.ReadSaveMetadata(savePath);
+
+            // Assert
+            Assert.NotNull(meta);
+            Assert.Equal(6, meta.TurnNumber);
+            Assert.Equal(1074, meta.CalendarYear);
+            Assert.Equal("Summer", meta.Season);
+            Assert.Equal("Summer 1074 AD", meta.InGameDate);
+            Assert.Equal(modName, meta.PrimaryModName);
+        }
+
+        [Fact]
+        public void ChronicleService_CalculatesEraAndDeltas_Correctly()
+        {
+            // Arrange
+            string faction = "Pontus";
+            var guid = Guid.NewGuid();
+
+            byte[] header1 = CreateMockSaveHeader(guid, 1, -270, 2, "[PublicBETA] RIS 0.7.0");
+            byte[] header2 = CreateMockSaveHeader(guid, 21, -265, 0, "[PublicBETA] RIS 0.7.0");
+
+            string p1 = Path.Combine(_activeDir, "save_Autosave Pontus Turn 1 End.sav");
+            string p2 = Path.Combine(_activeDir, "save_Autosave Pontus Turn 21.sav");
+
+            File.WriteAllBytes(p1, header1);
+            File.SetLastWriteTime(p1, new DateTime(2026, 1, 1, 10, 0, 0));
+
+            File.WriteAllBytes(p2, header2);
+            File.SetLastWriteTime(p2, new DateTime(2026, 1, 2, 15, 0, 0));
+
+            // Act
+            var chronicle = _chronicleService.BuildChronicle(faction);
+
+            // Assert
+            Assert.Equal("[PublicBETA] RIS 0.7.0", chronicle.ModName);
+            Assert.Equal("270 BC", chronicle.StartYear);
+            Assert.Equal("265 BC", chronicle.EndYear);
+            Assert.Equal(5, chronicle.TotalYearsSpan);
+            Assert.Contains("270 BC - 265 BC", chronicle.EraSummary);
+
+            Assert.Equal(2, chronicle.Milestones.Count);
+            var m1 = chronicle.Milestones[0];
+            var m2 = chronicle.Milestones[1];
+
+            Assert.Equal("Winter 270 BC", m1.InGameDate);
+            Assert.Null(m1.DeltaTurns);
+
+            Assert.Equal("Summer 265 BC", m2.InGameDate);
+            Assert.Equal(20, m2.DeltaTurns);
+            Assert.Equal(5, m2.DeltaYears);
+
+            // Reports
+            string md = _chronicleService.GenerateMarkdownReport(chronicle);
+            string html = _chronicleService.GenerateHtmlReport(chronicle);
+
+            Assert.Contains("Historical Era", md);
+            Assert.Contains("270 BC - 265 BC", md);
+            Assert.Contains("+20 turns, +5 yrs", md);
+
+            Assert.Contains("era-badge", html);
+            Assert.Contains("mod-badge", html);
+            Assert.Contains("date-pill", html);
+        }
+
+        [Fact]
+        public void SaveMetadataReader_ParsesRealSaveFiles_IfAvailable()
+        {
+            string realDir = @"C:\Users\eetup.DESKTOP-UM7MOIP\AppData\Local\Feral Interactive\Total War ROME REMASTERED\VFS\Local\Rome\saves";
+            if (!Directory.Exists(realDir)) return;
+
+            string sample1 = Path.Combine(realDir, "save_Autosave   Athens   Turn 20.sav");
+            if (File.Exists(sample1))
+            {
+                var meta = SaveMetadataReader.ReadSaveMetadata(sample1);
+                Assert.NotNull(meta);
+                Assert.Equal(20, meta.TurnNumber);
+                Assert.Equal(-266, meta.CalendarYear);
+                Assert.Equal("Summer", meta.Season);
+                Assert.Equal("Summer 266 BC", meta.InGameDate);
+            }
+
+            string sample2 = Path.Combine(realDir, "save_Autosave   Kingdom of Scotland   Turn 6.sav");
+            if (File.Exists(sample2))
+            {
+                var meta = SaveMetadataReader.ReadSaveMetadata(sample2);
+                Assert.NotNull(meta);
+                Assert.Equal(6, meta.TurnNumber);
+                Assert.Equal(1074, meta.CalendarYear);
+                Assert.Equal("Summer 1074 AD", meta.InGameDate);
+            }
+        }
     }
 }
 

@@ -24,6 +24,11 @@ namespace RRM_SM.Models
         /// The authoritative 16-byte Campaign GUID extracted directly from the save file header (bytes 36..51), if available.
         /// </summary>
         public string? GameCampaignId { get; set; }
+
+        public string? InGameDate { get; set; }
+        public int? CalendarYear { get; set; }
+        public string? Season { get; set; }
+        public string? ModName { get; set; }
     }
 }
 

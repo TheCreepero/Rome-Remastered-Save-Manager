@@ -49,13 +49,20 @@ namespace RRM_SM.Services
             var fileInfo = new FileInfo(filePath);
             string fileName = fileInfo.Name;
 
+            var saveMeta = SaveMetadataReader.ReadSaveMetadata(filePath);
+
             var saveInfo = new CampaignSaveInfo
             {
                 FilePath = filePath,
                 FileName = fileName,
                 LastModified = fileInfo.Exists ? fileInfo.LastWriteTime : DateTime.Now,
                 FileSizeBytes = fileInfo.Exists ? fileInfo.Length : 0,
-                GameCampaignId = TryReadInternalCampaignGuid(filePath)
+                GameCampaignId = saveMeta?.GameCampaignId ?? TryReadInternalCampaignGuid(filePath),
+                InGameDate = saveMeta?.InGameDate,
+                CalendarYear = saveMeta?.CalendarYear,
+                Season = saveMeta?.Season,
+                ModName = saveMeta?.PrimaryModName,
+                Turn = saveMeta?.TurnNumber
             };
 
             // 1. Quicksave check

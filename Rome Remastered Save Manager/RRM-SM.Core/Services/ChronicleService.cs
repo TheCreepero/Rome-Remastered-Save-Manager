@@ -87,7 +87,11 @@ namespace RRM_SM.Services
                         Turn = vs.Turn,
                         Type = vs.SaveType,
                         LastModified = vs.LastModified,
-                        FileSizeBytes = vs.FileSizeBytes
+                        FileSizeBytes = vs.FileSizeBytes,
+                        InGameDate = vs.InGameDate,
+                        ModName = vs.ModName,
+                        CalendarYear = vs.CalendarYear,
+                        GameCampaignId = vs.GameCampaignId
                     });
                 }
             }
@@ -169,6 +173,20 @@ namespace RRM_SM.Services
             var newMilestones = new List<ChronicleMilestone>();
             foreach (var save in uniqueSaves)
             {
+                // Ensure in-game date metadata is loaded if file is accessible
+                if (string.IsNullOrWhiteSpace(save.InGameDate) && File.Exists(save.FilePath))
+                {
+                    var meta = SaveMetadataReader.ReadSaveMetadata(save.FilePath);
+                    if (meta != null)
+                    {
+                        save.InGameDate = meta.InGameDate;
+                        save.CalendarYear = meta.CalendarYear;
+                        save.Season = meta.Season;
+                        if (string.IsNullOrWhiteSpace(save.ModName)) save.ModName = meta.PrimaryModName;
+                        if (!save.Turn.HasValue && meta.TurnNumber.HasValue) save.Turn = meta.TurnNumber;
+                    }
+                }
+
                 // Check if we already have this milestone
                 var existing = chronicle.Milestones.FirstOrDefault(m => m.SaveFileName.Equals(save.FileName, StringComparison.OrdinalIgnoreCase));
                 
@@ -177,35 +195,98 @@ namespace RRM_SM.Services
                     // Update dynamic properties
                     existing.Timestamp = save.LastModified;
                     existing.SaveSizeBytes = save.FileSizeBytes;
+                    if (string.IsNullOrWhiteSpace(existing.InGameDate)) existing.InGameDate = save.InGameDate;
+                    if (!existing.CalendarYear.HasValue) existing.CalendarYear = save.CalendarYear;
+                    if (string.IsNullOrWhiteSpace(existing.Season)) existing.Season = save.Season;
+                    if (string.IsNullOrWhiteSpace(existing.ModName)) existing.ModName = save.ModName;
                     newMilestones.Add(existing);
                 }
                 else
                 {
                     int turn = save.Turn ?? 0;
-                    
+                    string defaultTitle = !string.IsNullOrWhiteSpace(save.InGameDate)
+                        ? $"Turn {turn} ({save.InGameDate})"
+                        : (string.IsNullOrWhiteSpace(save.Turn?.ToString()) ? save.FileName : $"Turn {save.Turn}");
+
                     newMilestones.Add(new ChronicleMilestone
                     {
                         Turn = turn,
                         Timestamp = save.LastModified,
-                        Title = string.IsNullOrWhiteSpace(save.Turn.ToString()) ? save.FileName : $"Turn {save.Turn}",
+                        Title = defaultTitle,
                         SaveType = save.Type,
                         SaveSizeBytes = save.FileSizeBytes,
-                        SaveFileName = save.FileName
+                        SaveFileName = save.FileName,
+                        InGameDate = save.InGameDate,
+                        CalendarYear = save.CalendarYear,
+                        Season = save.Season,
+                        ModName = save.ModName
                     });
                 }
             }
 
-            // Sort by timestamp
+            // Sort by timestamp and calculate deltas
             chronicle.Milestones = newMilestones.OrderBy(m => m.Timestamp).ToList();
+
+            ChronicleMilestone? prevMilestone = null;
+            foreach (var m in chronicle.Milestones)
+            {
+                if (prevMilestone != null)
+                {
+                    m.DeltaTurns = m.Turn - prevMilestone.Turn;
+                    if (m.CalendarYear.HasValue && prevMilestone.CalendarYear.HasValue)
+                    {
+                        m.DeltaYears = Math.Abs(m.CalendarYear.Value - prevMilestone.CalendarYear.Value);
+                    }
+                }
+                prevMilestone = m;
+            }
 
             if (chronicle.Milestones.Any())
             {
                 chronicle.StartedAt = chronicle.Milestones.First().Timestamp;
                 chronicle.LastPlayedAt = chronicle.Milestones.Last().Timestamp;
                 chronicle.MaxTurn = chronicle.Milestones.Max(m => m.Turn);
+
+                // Detect primary mod and all active submods across milestones
+                var detectedMods = chronicle.Milestones
+                    .Where(m => !string.IsNullOrWhiteSpace(m.ModName) && !m.ModName.Equals("Rome Remastered", StringComparison.OrdinalIgnoreCase))
+                    .Select(m => m.ModName!)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (detectedMods.Count > 0)
+                {
+                    chronicle.ModName = detectedMods[0];
+                    chronicle.ActiveMods = detectedMods;
+                }
+                else if (string.IsNullOrWhiteSpace(chronicle.ModName))
+                {
+                    chronicle.ModName = "Rome Remastered";
+                }
+
+                // Historical Era span
+                var withYears = chronicle.Milestones.Where(m => m.CalendarYear.HasValue).ToList();
+                if (withYears.Any())
+                {
+                    int minYear = withYears.Min(m => m.CalendarYear!.Value);
+                    int maxYear = withYears.Max(m => m.CalendarYear!.Value);
+                    chronicle.StartYear = FormatYear(minYear);
+                    chronicle.EndYear = FormatYear(maxYear);
+                    chronicle.TotalYearsSpan = Math.Abs(maxYear - minYear);
+                    chronicle.EraSummary = $"{chronicle.StartYear} - {chronicle.EndYear} ({chronicle.TotalYearsSpan} years, {chronicle.MaxTurn} turns)";
+                }
+                else
+                {
+                    chronicle.EraSummary = $"{chronicle.MaxTurn} turns";
+                }
             }
 
             return chronicle;
+        }
+
+        public static string FormatYear(int year)
+        {
+            return year < 0 ? $"{Math.Abs(year)} BC" : $"{year} AD";
         }
 
         public void SaveChronicleNotes(CampaignChronicle chronicle)
@@ -223,6 +304,21 @@ namespace RRM_SM.Services
             var sb = new StringBuilder();
             sb.AppendLine($"# {chronicle.CampaignName} - Campaign Chronicle");
             sb.AppendLine();
+
+            sb.AppendLine($"- **Mod / Version:** {chronicle.ModName}");
+            if (chronicle.ActiveMods != null && chronicle.ActiveMods.Count > 1)
+            {
+                sb.AppendLine($"- **Active Submods:** {string.Join(", ", chronicle.ActiveMods)}");
+            }
+            if (!string.IsNullOrWhiteSpace(chronicle.EraSummary))
+            {
+                sb.AppendLine($"- **Historical Era:** {chronicle.EraSummary}");
+            }
+            if (chronicle.Milestones.Any())
+            {
+                sb.AppendLine($"- **Real-World Timeline:** {chronicle.StartedAt:yyyy-MM-dd} to {chronicle.LastPlayedAt:yyyy-MM-dd} ({chronicle.Milestones.Count} recorded milestones)");
+            }
+            sb.AppendLine();
             
             if (!string.IsNullOrWhiteSpace(chronicle.CampaignSummary))
             {
@@ -237,7 +333,12 @@ namespace RRM_SM.Services
             foreach (var milestone in chronicle.Milestones.OrderBy(m => m.Timestamp))
             {
                 string title = string.IsNullOrWhiteSpace(milestone.Title) ? milestone.SaveFileName : milestone.Title;
-                sb.AppendLine($"### {title} (Turn {milestone.Turn})");
+                string dateInfo = !string.IsNullOrWhiteSpace(milestone.InGameDate) ? $" - {milestone.InGameDate}" : "";
+                string deltaInfo = milestone.DeltaTurns.HasValue
+                    ? $" (+{milestone.DeltaTurns.Value} turns" + (milestone.DeltaYears.HasValue && milestone.DeltaYears.Value > 0 ? $", +{milestone.DeltaYears.Value} yrs" : "") + ")"
+                    : "";
+
+                sb.AppendLine($"### {title} (Turn {milestone.Turn}{dateInfo}){deltaInfo}");
                 sb.AppendLine($"*{milestone.Timestamp:yyyy-MM-dd HH:mm} | {milestone.SaveType}*");
                 
                 if (milestone.Tags != null && milestone.Tags.Any())
@@ -273,12 +374,18 @@ namespace RRM_SM.Services
             sb.AppendLine("    <style>");
             sb.AppendLine("        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f1ea; color: #333; line-height: 1.6; padding: 20px; }");
             sb.AppendLine("        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-top: 5px solid #b71c1c; }");
-            sb.AppendLine("        h1 { color: #b71c1c; text-align: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }");
+            sb.AppendLine("        h1 { color: #b71c1c; text-align: center; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 15px; }");
             sb.AppendLine("        h2 { color: #d32f2f; margin-top: 30px; }");
+            sb.AppendLine("        .meta-bar { background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 14px 18px; margin-bottom: 25px; }");
+            sb.AppendLine("        .badge { display: inline-block; padding: 4px 12px; border-radius: 14px; font-size: 0.85em; font-weight: 600; margin-right: 8px; margin-bottom: 6px; }");
+            sb.AppendLine("        .mod-badge { background: #5a4a20; color: #f5d77f; border: 1px solid #c9a84c; }");
+            sb.AppendLine("        .era-badge { background: #2e2e48; color: #98c379; border: 1px solid #3e3e5e; }");
+            sb.AppendLine("        .stat-badge { background: #f0f0f0; color: #424242; border: 1px solid #d0d0d0; }");
             sb.AppendLine("        .summary { background: #fafafa; padding: 15px; border-left: 4px solid #d32f2f; margin-bottom: 30px; font-style: italic; }");
             sb.AppendLine("        .milestone { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #eee; }");
             sb.AppendLine("        .milestone-header { display: flex; justify-content: space-between; align-items: baseline; }");
             sb.AppendLine("        .milestone-title { margin: 0; color: #424242; }");
+            sb.AppendLine("        .date-pill { background: #e8f0fe; color: #1967d2; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em; margin-left: 6px; }");
             sb.AppendLine("        .milestone-meta { font-size: 0.85em; color: #757575; }");
             sb.AppendLine("        .tags { margin-top: 5px; }");
             sb.AppendLine("        .tag { display: inline-block; background: #e0e0e0; color: #424242; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin-right: 5px; }");
@@ -289,6 +396,19 @@ namespace RRM_SM.Services
             sb.AppendLine("    <div class=\"container\">");
             sb.AppendLine($"        <h1>{System.Net.WebUtility.HtmlEncode(chronicle.CampaignName)} Chronicle</h1>");
             
+            // Meta bar with Mod, Era, and Stats
+            sb.AppendLine("        <div class=\"meta-bar\">");
+            if (!string.IsNullOrWhiteSpace(chronicle.ModName))
+            {
+                sb.AppendLine($"            <span class=\"badge mod-badge\">{System.Net.WebUtility.HtmlEncode(chronicle.ModName)}</span>");
+            }
+            if (!string.IsNullOrWhiteSpace(chronicle.EraSummary))
+            {
+                sb.AppendLine($"            <span class=\"badge era-badge\">{System.Net.WebUtility.HtmlEncode(chronicle.EraSummary)}</span>");
+            }
+            sb.AppendLine($"            <span class=\"badge stat-badge\">{chronicle.Milestones.Count} Milestones | Max Turn {chronicle.MaxTurn}</span>");
+            sb.AppendLine("        </div>");
+
             if (!string.IsNullOrWhiteSpace(chronicle.CampaignSummary))
             {
                 sb.AppendLine("        <h2>Campaign Summary</h2>");
@@ -300,9 +420,13 @@ namespace RRM_SM.Services
             foreach (var milestone in chronicle.Milestones.OrderBy(m => m.Timestamp))
             {
                 string title = string.IsNullOrWhiteSpace(milestone.Title) ? milestone.SaveFileName : milestone.Title;
+                string inGameDateHtml = !string.IsNullOrWhiteSpace(milestone.InGameDate)
+                    ? $" <span class=\"date-pill\">{System.Net.WebUtility.HtmlEncode(milestone.InGameDate)}</span>"
+                    : "";
+
                 sb.AppendLine("        <div class=\"milestone\">");
                 sb.AppendLine("            <div class=\"milestone-header\">");
-                sb.AppendLine($"                <h3 class=\"milestone-title\">{System.Net.WebUtility.HtmlEncode(title)} <small>(Turn {milestone.Turn})</small></h3>");
+                sb.AppendLine($"                <h3 class=\"milestone-title\">{System.Net.WebUtility.HtmlEncode(title)} <small>(Turn {milestone.Turn})</small>{inGameDateHtml}</h3>");
                 sb.AppendLine($"                <span class=\"milestone-meta\">{milestone.Timestamp:yyyy-MM-dd HH:mm} | {milestone.SaveType}</span>");
                 sb.AppendLine("            </div>");
                 

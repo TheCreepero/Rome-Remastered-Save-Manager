@@ -254,7 +254,10 @@ namespace RRM_SM.Services
                     CustomTitle = customTitle,
                     Notes = notes,
                     Tags = tags?.Distinct().ToList() ?? new List<string>(),
-                    IsPinned = false
+                    IsPinned = false,
+                    InGameDate = saveInfo.InGameDate,
+                    ModName = saveInfo.ModName,
+                    CalendarYear = saveInfo.CalendarYear
                 };
 
                 _manifest.Saves.Add(newItem);
@@ -640,7 +643,11 @@ namespace RRM_SM.Services
                                 FileSizeBytes = info.Length,
                                 Sha256Hash = hash,
                                 CreatedAt = info.CreationTime,
-                                LastModified = info.LastWriteTime
+                                LastModified = info.LastWriteTime,
+                                GameCampaignId = saveInfo.GameCampaignId,
+                                InGameDate = saveInfo.InGameDate,
+                                ModName = saveInfo.ModName,
+                                CalendarYear = saveInfo.CalendarYear
                             });
                             needsSave = true;
                         }
@@ -954,14 +961,24 @@ namespace RRM_SM.Services
                     save.SaveType = info.Type;
                 }
 
-                // If GameCampaignId is not yet recorded on this save item, try reading from disk
-                if (string.IsNullOrWhiteSpace(save.GameCampaignId))
+                // Backfill deep metadata from disk if file is available in vault directory
+                string diskPath = Path.Combine(_config.BackupDirectory, save.StoredFileName);
+                if (File.Exists(diskPath))
                 {
-                    string diskPath = Path.Combine(_config.BackupDirectory, save.StoredFileName);
-                    string? guid = CampaignParserService.TryReadInternalCampaignGuid(diskPath);
-                    if (!string.IsNullOrWhiteSpace(guid))
+                    if (string.IsNullOrWhiteSpace(save.GameCampaignId) || string.IsNullOrWhiteSpace(save.InGameDate))
                     {
-                        save.GameCampaignId = guid;
+                        var meta = SaveMetadataReader.ReadSaveMetadata(diskPath);
+                        if (meta != null)
+                        {
+                            if (string.IsNullOrWhiteSpace(save.GameCampaignId) && !string.IsNullOrWhiteSpace(meta.GameCampaignId))
+                            {
+                                save.GameCampaignId = meta.GameCampaignId;
+                            }
+                            if (string.IsNullOrWhiteSpace(save.InGameDate)) save.InGameDate = meta.InGameDate;
+                            if (!save.CalendarYear.HasValue) save.CalendarYear = meta.CalendarYear;
+                            if (string.IsNullOrWhiteSpace(save.ModName)) save.ModName = meta.PrimaryModName;
+                            if (!save.Turn.HasValue && meta.TurnNumber.HasValue) save.Turn = meta.TurnNumber;
+                        }
                     }
                 }
             }
@@ -1095,7 +1112,11 @@ namespace RRM_SM.Services
                          c.Faction.Equals(faction, StringComparison.OrdinalIgnoreCase)) &&
                         clusterSaves.Any(s => s.CampaignId == c.Id));
 
-                    string campaignId = existingCustom?.Id ?? Guid.NewGuid().ToString("N");
+                    var existingCampaign = existingCustom
+                        ?? (!string.IsNullOrWhiteSpace(clusterGuid) ? _manifest.Campaigns.Values.FirstOrDefault(c => c.GameCampaignId == clusterGuid) : null)
+                        ?? _manifest.Campaigns.Values.FirstOrDefault(c => clusterSaves.Any(s => s.CampaignId == c.Id));
+
+                    string campaignId = existingCampaign?.Id ?? Guid.NewGuid().ToString("N");
                     string displayName;
 
                     if (existingCustom != null && existingCustom.IsCustomNamed)

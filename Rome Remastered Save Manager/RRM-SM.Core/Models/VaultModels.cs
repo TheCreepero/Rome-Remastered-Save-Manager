@@ -60,6 +60,10 @@ namespace RRM_SM.Models
         public List<string> Tags { get; set; } = new();
         public bool IsPinned { get; set; }
 
+        public string? InGameDate { get; set; }
+        public string? ModName { get; set; }
+        public int? CalendarYear { get; set; }
+
         // Helper getters
         public string DisplayName => !string.IsNullOrWhiteSpace(CustomTitle) ? CustomTitle : StoredFileName;
         public bool IsSentinel => Source == SaveSourceType.Sentinel;

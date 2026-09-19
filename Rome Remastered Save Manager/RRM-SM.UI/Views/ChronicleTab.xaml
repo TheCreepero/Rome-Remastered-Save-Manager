@@ -31,6 +31,22 @@
                     <ComboBox ItemsSource="{Binding AllKnownCampaigns}"
                               SelectedItem="{Binding SelectedChronicleCampaign}"
                               MinWidth="180" Height="28" VerticalContentAlignment="Center" Background="#3E3E5E" Foreground="White" BorderBrush="#5E5E7E"/>
+                    <Border Background="#5A4A20" CornerRadius="4" Padding="8,4" Margin="10,0,0,0" BorderBrush="#C9A84C" BorderThickness="1">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ChronicleModName}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ChronicleModName}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding ChronicleModName}" Foreground="#F5D77F" FontWeight="Bold" FontSize="11"/>
+                    </Border>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -170,6 +186,21 @@
                                     <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Title}" Foreground="White" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
                                     
                                     <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,4,0,0">
+                                        <TextBlock Text="{Binding InGameDate}" Foreground="#61AFEF" FontSize="11" FontWeight="SemiBold" Margin="0,0,8,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding InGameDate}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding InGameDate}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                         <TextBlock Text="{Binding SaveType}" Foreground="#98C379" FontSize="11" Margin="0,0,8,0"/>
                                         <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Foreground="#B0B0D0" FontSize="11"/>
                                     </StackPanel>
@@ -205,13 +236,43 @@
                     </Grid.RowDefinitions>
 
                     <!-- Header -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16" VerticalAlignment="Center">
                         <TextBlock Text="Turn " Foreground="#B0B0D0" FontSize="18"/>
                         <TextBlock Text="{Binding SelectedMilestone.Turn}" Foreground="#C9A84C" FontSize="18" FontWeight="Bold"/>
                         <TextBlock Text="  |  " Foreground="#5E5E7E" FontSize="18"/>
-                        <TextBlock Text="{Binding SelectedMilestone.Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Foreground="#B0B0D0" FontSize="16" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
+                        <TextBlock Text="{Binding SelectedMilestone.InGameDate}" Foreground="#61AFEF" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,0,1">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedMilestone.InGameDate}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding SelectedMilestone.InGameDate}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="  |  " Foreground="#5E5E7E" FontSize="18">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedMilestone.InGameDate}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding SelectedMilestone.InGameDate}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="{Binding SelectedMilestone.Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Foreground="#B0B0D0" FontSize="15" VerticalAlignment="Center" Margin="0,0,0,1"/>
                         <TextBlock Text="  |  " Foreground="#5E5E7E" FontSize="18"/>
-                        <TextBlock Text="{Binding SelectedMilestone.SaveType}" Foreground="#98C379" FontSize="16" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
+                        <TextBlock Text="{Binding SelectedMilestone.SaveType}" Foreground="#98C379" FontSize="15" VerticalAlignment="Center" Margin="0,0,0,1"/>
                     </StackPanel>
 
                     <!-- Title -->

@@ -76,6 +76,8 @@ namespace RRM_SM.UI.ViewModels
         private ObservableCollection<ChronicleMilestone> _chronicleMilestones = new();
         private ChronicleMilestone? _selectedMilestone;
         private string _chronicleStatsSummary = string.Empty;
+        private string _chronicleModName = string.Empty;
+        private string _chronicleEraSummary = string.Empty;
         private CampaignChronicle? _currentChronicle;
 
         public Action? RestoreWindowRequested { get; set; }
@@ -448,6 +450,18 @@ namespace RRM_SM.UI.ViewModels
         {
             get => _chronicleStatsSummary;
             set { _chronicleStatsSummary = value; OnPropertyChanged(); }
+        }
+
+        public string ChronicleModName
+        {
+            get => _chronicleModName;
+            set { _chronicleModName = value; OnPropertyChanged(); }
+        }
+
+        public string ChronicleEraSummary
+        {
+            get => _chronicleEraSummary;
+            set { _chronicleEraSummary = value; OnPropertyChanged(); }
         }
 
         // ───────────────────── Commands ─────────────────────
@@ -1120,6 +1134,8 @@ namespace RRM_SM.UI.ViewModels
                 ChronicleMilestones.Clear();
                 _currentChronicle = null;
                 ChronicleStatsSummary = string.Empty;
+                ChronicleModName = string.Empty;
+                ChronicleEraSummary = string.Empty;
                 return;
             }
 
@@ -1132,7 +1148,17 @@ namespace RRM_SM.UI.ViewModels
                 int totalTurns = _currentChronicle.MaxTurn;
                 int count = _currentChronicle.Milestones.Count;
                 
-                ChronicleStatsSummary = $"{count} Milestones | Max Turn {totalTurns}";
+                ChronicleModName = _currentChronicle.ModName;
+                ChronicleEraSummary = _currentChronicle.EraSummary ?? string.Empty;
+
+                if (!string.IsNullOrWhiteSpace(_currentChronicle.EraSummary))
+                {
+                    ChronicleStatsSummary = $"{_currentChronicle.EraSummary}  |  {count} Milestones";
+                }
+                else
+                {
+                    ChronicleStatsSummary = $"{count} Milestones | Max Turn {totalTurns}";
+                }
             }
             catch (Exception ex)
             {
