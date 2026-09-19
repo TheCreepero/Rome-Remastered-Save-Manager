@@ -2,12 +2,19 @@
 setlocal
 cd /d "%~dp0"
 
-:: Check if build exists, if not build it first
+:: Check if running alongside standalone executable
+if exist "RomeRemasteredSaveManager.exe" (
+    start "" /d "%~dp0" "RomeRemasteredSaveManager.exe"
+    exit /b 0
+)
+
+:: If in development repository, build incremental changes
+set "CSPROJ=Rome Remastered Save Manager\RRM-SM.UI\RRM-SM.UI.csproj"
 set "EXE_PATH=Rome Remastered Save Manager\RRM-SM.UI\bin\Debug\net10.0-windows\RRM-SM.UI.exe"
 
-if not exist "%EXE_PATH%" (
+if exist "%CSPROJ%" (
     echo Building Rome Remastered Save Manager UI...
-    dotnet build "Rome Remastered Save Manager\RRM-SM.UI\RRM-SM.UI.csproj" -c Debug
+    dotnet build "%CSPROJ%" -c Debug
     if errorlevel 1 (
         echo.
         echo [ERROR] Build failed. Make sure .NET 10 SDK is installed.
@@ -17,6 +24,12 @@ if not exist "%EXE_PATH%" (
 )
 
 :: Launch the UI detached so the terminal window doesn't stay open
-start "" /d "%~dp0" "%EXE_PATH%"
+if exist "%EXE_PATH%" (
+    start "" /d "%~dp0" "%EXE_PATH%"
+) else (
+    echo [ERROR] Executable not found at %EXE_PATH%
+    pause
+    exit /b 1
+)
 exit /b 0
 
